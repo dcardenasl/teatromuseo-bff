@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Commands;
+
+use CodeIgniter\CLI\BaseCommand;
+use CodeIgniter\CLI\CLI;
+
+/**
+ * Spark CLI command to scaffold proxy controllers and routes for domain upstreams.
+ *
+ * Usage: php spark bff:make-proxy <domain> <resource> [--force]
+ */
+class MakeProxy extends BaseCommand
+{
+    protected $group       = 'BFF';
+    protected $name        = 'bff:make-proxy';
+    protected $description = 'Scaffold a transparent BFF proxy controller and its route mapping for a downstream domain';
+    protected $usage       = 'bff:make-proxy <domain> <resource> [options]';
+
+    /**
+     * @var array<string, string>
+     */
+    protected $arguments = [
+        'domain'   => 'The target domain identifier (e.g., catalog, events, hub)',
+        'resource' => 'The REST resource name (e.g., products, tickets)',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $options = [
+        '--force' => 'Force overwrite existing controller and routes file',
+    ];
+
+    public function run(array $params)
+    {
+        $domain   = $params[0] ?? null;
+        $resource = $params[1] ?? null;
+
+        if ($domain === null || $resource === null) {
+            CLI::error('Error: Both <domain> and <resource> arguments are required.');
+            CLI::write('Usage: php spark ' . $this->usage, 'yellow');
+            return EXIT_ERROR;
+        }
+
+        $force = array_key_exists('force', $params);
+
+        // Sanitize and format
+        $domainLower    = strtolower(preg_replace('/[^a-zA-Z0-9-_]/', '', $domain));
+        $resourceLower  = strtolower(preg_replace('/[^a-zA-Z0-9-_]/', '', $resource));
+        $pascalDomain   = $this->pascalize($domainLower);
+        $pascalResource = $this->pascalize($resourceLower);
+
+        // Target file paths
+        $controllerDir  = APPPATH . 'Controllers/Api/V1/' . $pascalDomain;
+        $controllerPath = $controllerDir . '/' . $pascalResource . 'ProxyController.php';
+        $routesPath     = APPPATH . 'Config/Routes/v1/' . $resourceLower . '.php';
+
+        CLI::write('Scaffolding BFF proxy for upstream domain ' . CLI::color($domainLower, 'cyan') . '...', 'yellow');
+
+        // Create controller directory if it doesn't exist
+        if (! is_dir($controllerDir)) {
+            if (! mkdir($controllerDir, 0755, true) && ! is_dir($controllerDir)) {
+                CLI::error('Failed to create directory: ' . $controllerDir);
+                return EXIT_ERROR;
+            }
+        }
+
+        // Generate Controller
+        if (file_exists($controllerPath) && ! $force) {
+            CLI::error('Controller already exists: ' . $controllerPath);
+            CLI::write('Use --force to overwrite.', 'yellow');
+            return EXIT_ERROR;
+        }
+
+        $clientMethod = ($domainLower === 'hub' || $domainLower === 'api')
+            ? 'hubClient()'
+            : "domainClient('{$domainLower}')";
+
+        $controllerTemplate = $this->getControllerTemplate($pascalDomain, $pascalResource, $clientMethod, $resourceLower);
+
+        if (file_put_contents($controllerPath, $controllerTemplate) === false) {
+            CLI::error('Failed to write controller to: ' . $controllerPath);
+            return EXIT_ERROR;
+        }
+        CLI::write('  [NEW] Controller: ' . $controllerPath, 'green');
+
+        // Generate Routing File
+        if (file_exists($routesPath) && ! $force) {
+            CLI::write('  [SKIP] Routes file already exists: ' . $routesPath, 'yellow');
+        } else {
+            $routesTemplate = $this->getRoutesTemplate($pascalDomain, $pascalResource, $resourceLower);
+            if (file_put_contents($routesPath, $routesTemplate) === false) {
+                CLI::error('Failed to write routing config to: ' . $routesPath);
+                return EXIT_ERROR;
+            }
+            CLI::write('  [NEW] Routes File: ' . $routesPath, 'green');
+        }
+
+        CLI::write('', '');
+        CLI::write('Scaffolding completed successfully!', 'green');
+        CLI::write('Please ensure the upstream domain ' . CLI::color($domainLower, 'cyan') . ' is configured in ' . CLI::color('Config\\Bff::$domains', 'white') . '.', 'cyan');
+        CLI::write('', '');
+
+        return EXIT_SUCCESS;
+    }
+
+    private function pascalize(string $string): string
+    {
+        $string = str_replace(['-', '_'], ' ', $string);
+        $string = ucwords($string);
+
+        return str_replace(' ', '', $string);
+    }
+
+    private function getControllerTemplate(string $domain, string $resource, string $clientMethod, string $resourcePath): string
+    {
+        return <<<PHP
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controllers\Api\V1\\{$domain};
+
+use App\Controllers\BaseProxyController;
+use CodeIgniter\HTTP\ResponseInterface;
+use Config\Services;
+
+/**
+ * Transparent proxy controller for upstream resource: {$resourcePath}.
+ *
+ * Auto-generated by php spark bff:make-proxy.
+ */
+class {$resource}ProxyController extends BaseProxyController
+{
+    public function index(): ResponseInterface
+    {
+        return \$this->proxy(Services::{$clientMethod}, '/api/v1/{$resourcePath}');
+    }
+
+    public function show(int \$id): ResponseInterface
+    {
+        return \$this->proxy(Services::{$clientMethod}, '/api/v1/{$resourcePath}/' . \$id);
+    }
+
+    public function create(): ResponseInterface
+    {
+        return \$this->proxy(Services::{$clientMethod}, '/api/v1/{$resourcePath}');
+    }
+
+    public function update(int \$id): ResponseInterface
+    {
+        return \$this->proxy(Services::{$clientMethod}, '/api/v1/{$resourcePath}/' . \$id);
+    }
+
+    public function delete(int \$id): ResponseInterface
+    {
+        return \$this->proxy(Services::{$clientMethod}, '/api/v1/{$resourcePath}/' . \$id);
+    }
+}
+PHP;
+    }
+
+    private function getRoutesTemplate(string $domain, string $resource, string $resourcePath): string
+    {
+        return <<<PHP
+<?php
+
+/** @var \CodeIgniter\Router\RouteCollection \$routes */
+
+// Auto-generated proxy routes for Upstream Domain: {$domain}
+\$routes->get('{$resourcePath}', '\App\Controllers\Api\V1\\{$domain}\\{$resource}ProxyController::index');
+\$routes->get('{$resourcePath}/(:num)', '\App\Controllers\Api\V1\\{$domain}\\{$resource}ProxyController::show/\$1');
+\$routes->post('{$resourcePath}', '\App\Controllers\Api\V1\\{$domain}\\{$resource}ProxyController::create');
+\$routes->put('{$resourcePath}/(:num)', '\App\Controllers\Api\V1\\{$domain}\\{$resource}ProxyController::update/\$1');
+\$routes->delete('{$resourcePath}/(:num)', '\App\Controllers\Api\V1\\{$domain}\\{$resource}ProxyController::delete/\$1');
+PHP;
+    }
+}

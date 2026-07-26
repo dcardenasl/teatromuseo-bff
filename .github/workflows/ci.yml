@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    name: Test PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: intl, mbstring, json, openssl, curl
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Configure .env for CI
+        run: |
+          cp .env.example .env
+          printf '\nBFF_ALLOWED_ORIGINS=http://localhost:3000\n' >> .env
+          printf 'bff.hubUrl=http://localhost:8080\n' >> .env
+          printf 'bff.domainUrl=http://localhost:8090\n' >> .env
+          php spark key:generate --force
+
+      - name: Run quality suite
+        run: composer quality

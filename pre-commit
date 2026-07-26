@@ -1,0 +1,20 @@
+#!/bin/bash
+
+echo "Running pre-commit checks..."
+
+# Run PHP CS Fixer check
+composer cs-check
+if [ $? -ne 0 ]; then
+    echo "❌ Code style check failed. Run 'composer cs-fix' to fix issues."
+    exit 1
+fi
+
+# Run PHPStan
+composer phpstan
+if [ $? -ne 0 ]; then
+    echo "❌ PHPStan analysis failed. Fix the issues before committing."
+    exit 1
+fi
+
+echo "✓ All checks passed"
+exit 0

@@ -1,0 +1,85 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run every Monday at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  security:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, mbstring, intl, json
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-security-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-security-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Check for security vulnerabilities
+        run: composer audit
+
+      - name: Check outdated dependencies
+        continue-on-error: true
+        run: composer outdated --direct
+
+      - name: Scan for secrets (basic check)
+        run: |
+          echo "Scanning for potential secrets in code..."
+
+          # Check for potential hardcoded secrets
+          if grep -rn "password\s*=\s*['\"][^'\"]*['\"]" app/ --include="*.php" | grep -v "password_hash" | grep -v "password_verify"; then
+            echo "⚠️  Warning: Potential hardcoded passwords found"
+            exit 1
+          fi
+
+          # Check for API keys patterns
+          if grep -rn "['\"][a-zA-Z0-9]{32,}['\"]" app/ --include="*.php" | grep -i "key\|token\|secret"; then
+            echo "⚠️  Warning: Potential hardcoded API keys found"
+            exit 1
+          fi
+
+          echo "✓ No obvious hardcoded secrets found"
+
+      - name: Check for .env files in repository
+        run: |
+          if git ls-files | grep -E "^\.env$|^\.env\.docker$"; then
+            echo "❌ ERROR: .env files should not be committed!"
+            exit 1
+          fi
+          echo "✓ No .env files in repository"
+
+      - name: Verify .gitignore contains sensitive files
+        run: |
+          if ! grep -q "^\.env$" .gitignore; then
+            echo "❌ ERROR: .env not in .gitignore"
+            exit 1
+          fi
+          if ! grep -q "^\*\.key$" .gitignore; then
+            echo "❌ ERROR: *.key not in .gitignore"
+            exit 1
+          fi
+          echo "✓ .gitignore properly configured"

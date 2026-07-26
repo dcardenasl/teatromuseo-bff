@@ -1,0 +1,78 @@
+name: Release
+
+# On `v*.*.*` tag push, extract the matching section from CHANGELOG.md
+# and create a GitHub Release with those notes.
+# The version in the tag must already exist as a `## [<version>]` heading
+# in CHANGELOG.md — `chore: release vX.Y.Z` should be the last commit on
+# `dev` before the merge to `main`.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md not found in repo root."
+            exit 1
+          fi
+
+          # Pull the body between `## [VERSION]` and the next `## [`,
+          # excluding the heading line itself.
+          NOTES=$(awk -v ver="${VERSION}" '
+            BEGIN { capture = 0 }
+            /^## \[/ {
+              if (capture) { exit }
+              if ($0 ~ "^## \\[" ver "\\]") { capture = 1; next }
+            }
+            capture { print }
+          ' CHANGELOG.md)
+
+          if [ -z "${NOTES}" ]; then
+            echo "::error::No CHANGELOG section found for version ${VERSION}. Did you forget to rename [Unreleased] before tagging?"
+            exit 1
+          fi
+
+          {
+            echo 'notes<<EOF_RELEASE_NOTES'
+            echo "${NOTES}"
+            echo 'EOF_RELEASE_NOTES'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
+        run: |
+          # Write notes to a file to avoid shell injection from CHANGELOG content.
+          printf '%s' "${RELEASE_NOTES}" > /tmp/release_notes.md
+          # Soft-fail when the release already exists (re-tag scenarios).
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; updating notes."
+            gh release edit "${GITHUB_REF_NAME}" --notes-file /tmp/release_notes.md
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "${GITHUB_REF_NAME}" \
+              --notes-file /tmp/release_notes.md
+          fi

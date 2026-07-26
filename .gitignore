@@ -1,0 +1,195 @@
+#-------------------------
+# Operating Specific Junk Files
+#-------------------------
+
+# OS X
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# OS X Thumbnails
+._*
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# Linux
+*~
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+#-------------------------
+# Environment Files
+#-------------------------
+# These should never be under version control,
+# as it poses a security risk.
+.env
+.env.*
+!.env.example
+!.env.docker.example
+.vagrant
+Vagrantfile
+
+#-------------------------
+# Security & Secrets
+#-------------------------
+# Never commit sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+.secrets
+.credentials
+
+#-------------------------
+# Temporary Files
+#-------------------------
+# Ignore all content in writable directories
+writable/cache/*
+writable/logs/*
+writable/session/*
+writable/uploads/*
+writable/debugbar/*
+
+# Allow tracking only the structural files (.gitkeep or index.html)
+!writable/cache/.gitkeep
+!writable/cache/index.html
+!writable/logs/.gitkeep
+!writable/logs/index.html
+!writable/session/.gitkeep
+!writable/session/index.html
+!writable/uploads/.gitkeep
+!writable/uploads/index.html
+!writable/debugbar/.gitkeep
+!writable/debugbar/index.html
+
+writable/database.db
+writable/database.db-*
+
+php_errors.log
+
+#-------------------------
+# Setup Scripts
+#-------------------------
+setup_db.php
+setup_mysql.php
+init.log
+install.log
+setup.log
+
+#-------------------------
+# User Guide Temp Files
+#-------------------------
+user_guide_src/build/*
+user_guide_src/cilexer/build/*
+user_guide_src/cilexer/dist/*
+user_guide_src/cilexer/pycilexer.egg-info/*
+
+#-------------------------
+# Test Files
+#-------------------------
+tests/coverage*
+coverage/
+
+# Don't save phpunit under version control.
+phpunit
+
+#-------------------------
+# Composer
+#-------------------------
+vendor/
+
+#-------------------------
+# IDE / Development Files
+#-------------------------
+
+# Modules Testing
+_modules/*
+
+# phpenv local config
+.php-version
+
+# Jetbrains editors (PHPStorm, etc)
+.idea/
+*.iml
+
+# NetBeans
+/nbproject/
+/build/
+/nbbuild/
+/dist/
+/nbdist/
+/nbactions.xml
+/nb-configuration.xml
+/.nb-gradle/
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+.phpintel
+/api/
+
+# Visual Studio Code
+.vscode/
+
+/results/
+.phpunit.result.cache
+.phpunit.cache
+
+# Code Quality Tools
+.php-cs-fixer.cache
+.phpstan.cache
+
+# Note: composer.lock should be committed in production projects
+
+#-------------------------
+# Docker
+#-------------------------
+# Docker volumes and local overrides
+docker-compose.override.yml
+.docker/
+docker/data/
+
+#-------------------------
+# Backup Files
+#-------------------------
+*.sql
+*.sql.gz
+*.backup
+*.bak
+backup/
+
+#-------------------------
+# Claude Code
+#-------------------------
+# Keep documentation and agents, but ignore personal settings
+.claude/settings.local.json
+
+public/writable/tests/uploads/
+
+public/writable/uploads/
+
+tests/ci4_test.sqlite
