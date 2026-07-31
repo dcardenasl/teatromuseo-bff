@@ -193,3 +193,6 @@ public/writable/tests/uploads/
 public/writable/uploads/
 
 tests/ci4_test.sqlite
+
+# Local FTP deploy tooling (credentials + generated artifacts)
+.deploy/
