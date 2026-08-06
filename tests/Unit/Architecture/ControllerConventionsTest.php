@@ -15,16 +15,15 @@ use CodeIgniter\Test\CIUnitTestCase;
 class ControllerConventionsTest extends CIUnitTestCase
 {
     /**
-     * Controllers/methods allowed to bypass strict JSON handleRequest convention.
+     * Controllers/methods allowed to bypass strict BaseProxyController conventions.
      *
-     * Non-JSON transport endpoints are allowed (download/stream).
-     * Infra controllers are not under app/Controllers/Api/V1 nor ApiController descendants.
+     * HealthController is keeping thin (no BaseProxyController overhead) as an infrastructure probe.
      */
-    private const ALLOWED_TRY_CATCH_CONTROLLERS = [
-        'app/Controllers/Api/V1/Files/FileController.php',
+    private const ALLOWED_INFRA_CONTROLLERS = [
+        'app/Controllers/Api/V1/System/HealthController.php',
     ];
 
-    public function testApiV1ControllersDoNotReimplementHandleRequestPipeline(): void
+    public function testApiV1ControllersExtendBaseProxyControllerAndFollowConventions(): void
     {
         $root = rtrim((string) ROOTPATH, DIRECTORY_SEPARATOR);
         $controllerPaths = [];
@@ -52,37 +51,21 @@ class ControllerConventionsTest extends CIUnitTestCase
                 continue;
             }
 
-            if (! str_contains($source, 'extends ApiController')) {
+            $isInfra = in_array($relative, self::ALLOWED_INFRA_CONTROLLERS, true);
+            if ($isInfra) {
                 continue;
             }
 
-            $allowsTryCatch = in_array($relative, self::ALLOWED_TRY_CATCH_CONTROLLERS, true);
-
-            if (preg_match('/\bcollectRequestData\s*\(/', $source) === 1) {
-                $violations[] = $relative . ': collectRequestData() must not be called directly in concrete controller';
+            if (! str_contains($source, 'extends BaseProxyController')) {
+                $violations[] = $relative . ': must extend BaseProxyController';
+                continue;
             }
 
-            if (preg_match('/protected\s+string\s+\$serviceName\s*=/', $source) === 1) {
-                $violations[] = $relative . ': serviceName locator property is forbidden; resolve service explicitly';
-            }
-
-            if (preg_match('/\bgetService\s*\(/', $source) === 1) {
-                $violations[] = $relative . ': getService() locator usage is forbidden; use explicit service property';
-            }
-
-            if (preg_match('/\bresolveDefaultService\s*\(/', $source) !== 1) {
-                $violations[] = $relative . ': missing resolveDefaultService() explicit dependency contract';
-            }
-
-            if (! $allowsTryCatch && preg_match('/\btry\s*\{/', $source) === 1) {
-                $violations[] = $relative . ': try/catch not allowed; use ApiController::handleRequest()';
-            }
-
-            if (! $allowsTryCatch && preg_match('/\bhandleException\s*\(/', $source) === 1) {
-                $violations[] = $relative . ': direct handleException() usage not allowed in concrete controller';
+            if (preg_match('/\btry\s*\{/', $source) === 1) {
+                $violations[] = $relative . ': try/catch not allowed; BaseProxyController handles upstream exceptions';
             }
         }
 
-        $this->assertSame([], $violations, "Controller convention violations:\n- " . implode("\n- ", $violations));
+        $this->assertSame([], $violations, "BFF Controller convention violations:\n- " . implode("\n- ", $violations));
     }
 }
