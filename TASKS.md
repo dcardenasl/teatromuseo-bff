@@ -49,6 +49,26 @@ vendorizado en vez de duplicarlo. Es el código más limpio de toda la auditorí
 
 ### ✅ Completadas recientemente
 
+- **CORE-03 + fix de test dependiente del entorno (2026-08-06)** — dos cambios acotados, hechos
+  mientras se migraba el resto de la flota; no alteran la decisión de congelar este repo.
+  - `app/Config/Api.php` pasa de 148 líneas copiadas verbatim (byte-idénticas a las de cms, catalog
+    y event) a extender `dcardenasl\Ci4ApiCore\Config\Api`. Se documenta que las propiedades JWT
+    heredadas son inertes aquí: el BFF nunca tiene el secreto, reenvía el `Authorization` e
+    introspecta contra el hub.
+  - `ci4-api-core` subido a v1.2.0, y el 2026-08-06 otra vez a **v1.3.0** (publicada por David en
+    el checkout que mantiene activamente, `ci4-platform/ci4-api-core`) — todo aditivo, sin cambios
+    de código en este repo más allá de la subida de versión.
+  - **`CorsHeadersTest` llevaba fallando por dependencia del entorno.** Usaba `putenv()`, pero el
+    `env()` de CI4 resuelve `$_ENV[$k] ?? $_SERVER[$k] ?? getenv($k)`, y el `.env` de este repo
+    define `BFF_ALLOWED_ORIGINS` — DotEnv ya había poblado `$_ENV`, así que el `putenv()` se
+    ignoraba y la lista de permitidos del test nunca se aplicaba. Ahora controla las tres fuentes,
+    resetea `Factories` (Config\Bff y Config\Cors parsean en sus constructores) y restaura todo en
+    `tearDown()`.
+  - Observación sin acción: el `.env` local lista `http://localhost:8186` como origen permitido —
+    ese es el puerto del **tótem**, no de un cliente del BFF. Resto de copia/pega.
+
+  **Verificación:** `composer quality` ✅ — 139 tests / 352 assertions, PHPStan sin errores.
+
 - **Forwarding de headers de firma de webhooks**: `DomainClient::buildForwardedHeaders()` reenvía `X-Twilio-Email-Event-Webhook-Signature/-Timestamp` y `X-Webhook-Token` para que los domains puedan verificar firmas de webhooks proxied. Backport del stack multi-subscription (auditoría 2026-06-10, H-2).
 - **Unificación de Throttling (BFF-M1)**: `ThrottleFilter` local eliminado en favor de la implementación del core. `RateLimitResponseHelpers` eliminado (ahora consumido desde `ci4-api-core`).
 - **Propagación de `app_id`**: El BFF ahora es consciente de la aplicación a través de la propagación automática en `IntrospectAuthFilter` y `ContextHolder`.

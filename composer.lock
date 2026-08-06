@@ -85,16 +85,16 @@
         },
         {
             "name": "dcardenasl/ci4-api-core",
-            "version": "v1.1.1",
+            "version": "v1.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/dcardenasl/ci4-api-core.git",
-                "reference": "25ed3183f6bf795332c5d9f5a2c59c036b0e8c17"
+                "reference": "829678f9a6694cdaf4636449ffb99d7cc83281d7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/dcardenasl/ci4-api-core/zipball/25ed3183f6bf795332c5d9f5a2c59c036b0e8c17",
-                "reference": "25ed3183f6bf795332c5d9f5a2c59c036b0e8c17",
+                "url": "https://api.github.com/repos/dcardenasl/ci4-api-core/zipball/829678f9a6694cdaf4636449ffb99d7cc83281d7",
+                "reference": "829678f9a6694cdaf4636449ffb99d7cc83281d7",
                 "shasum": ""
             },
             "require": {
@@ -170,7 +170,7 @@
                 "issues": "https://github.com/dcardenasl/ci4-api-core/issues",
                 "source": "https://github.com/dcardenasl/ci4-api-core"
             },
-            "time": "2026-08-01T18:28:46+00:00"
+            "time": "2026-08-06T15:28:52+00:00"
         },
         {
             "name": "guzzlehttp/psr7",
