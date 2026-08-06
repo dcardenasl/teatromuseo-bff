@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Cors;
 
+use CodeIgniter\Config\Factories;
 use Tests\Support\ApiTestCase;
 
 /**
@@ -18,10 +19,49 @@ use Tests\Support\ApiTestCase;
  */
 class CorsHeadersTest extends ApiTestCase
 {
+    private const ALLOWED = 'http://localhost:5173,http://localhost:3000';
+
+    /** @var array{env: string|null, server: string|null} */
+    private array $originalOrigins;
+
     protected function setUp(): void
     {
         parent::setUp();
-        putenv('BFF_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000');
+
+        // CI4's env() resolves `$_ENV[$key] ?? $_SERVER[$key] ?? getenv($key)`,
+        // so a bare putenv() is silently ignored whenever the developer's .env
+        // defines BFF_ALLOWED_ORIGINS (it does) — DotEnv has already populated
+        // $_ENV by then. Override all three so the test controls the allow-list
+        // regardless of the local .env, and restore them in tearDown.
+        $this->originalOrigins = [
+            'env'    => $_ENV['BFF_ALLOWED_ORIGINS'] ?? null,
+            'server' => $_SERVER['BFF_ALLOWED_ORIGINS'] ?? null,
+        ];
+
+        $_ENV['BFF_ALLOWED_ORIGINS']    = self::ALLOWED;
+        $_SERVER['BFF_ALLOWED_ORIGINS'] = self::ALLOWED;
+        putenv('BFF_ALLOWED_ORIGINS=' . self::ALLOWED);
+
+        // Config\Bff parses the allow-list in its constructor and Config\Cors
+        // reads Config\Bff in its own; CI4 caches both in Factories. Without
+        // this reset the instances built before the override are reused.
+        Factories::reset('config');
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (['env' => '_ENV', 'server' => '_SERVER'] as $key => $global) {
+            if ($this->originalOrigins[$key] === null) {
+                unset($GLOBALS[$global]['BFF_ALLOWED_ORIGINS']);
+            } else {
+                $GLOBALS[$global]['BFF_ALLOWED_ORIGINS'] = $this->originalOrigins[$key];
+            }
+        }
+
+        putenv('BFF_ALLOWED_ORIGINS');
+        Factories::reset('config');
+
+        parent::tearDown();
     }
 
     public function testAllowsOriginInAllowlist(): void
