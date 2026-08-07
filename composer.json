@@ -34,11 +34,15 @@
     "scripts": {
         "post-install-cmd": [
             "chmod +x pre-commit",
-            "[ -d .git/hooks ] && cp pre-commit .git/hooks/pre-commit || true"
+            "[ -d .git/hooks ] && cp pre-commit .git/hooks/pre-commit || true",
+            "chmod +x pre-push",
+            "[ -d .git/hooks ] && cp pre-push .git/hooks/pre-push || true"
         ],
         "post-update-cmd": [
             "chmod +x pre-commit",
-            "[ -d .git/hooks ] && cp pre-commit .git/hooks/pre-commit || true"
+            "[ -d .git/hooks ] && cp pre-commit .git/hooks/pre-commit || true",
+            "chmod +x pre-push",
+            "[ -d .git/hooks ] && cp pre-push .git/hooks/pre-push || true"
         ],
         "test:unit": "phpunit --testsuite=Unit --configuration=phpunit.xml --no-coverage --testdox",
         "test:feature": "phpunit --testsuite=Feature --configuration=phpunit.xml --no-coverage --testdox",

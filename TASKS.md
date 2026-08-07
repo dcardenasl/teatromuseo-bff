@@ -49,6 +49,17 @@ vendorizado en vez de duplicarlo. Es el código más limpio de toda la auditorí
 
 ### ✅ Completadas recientemente
 
+- **CFG-06 — fix de cableado de instalación del hook `pre-push` (2026-08-07)** — el `pre-push`
+  creado para CFG-06 (root `TASKS.md`) existía en la raíz del repo y estaba copiado a mano en
+  `.git/hooks/pre-push`, pero su propio comentario de cabecera afirmaba falsamente "Installed by
+  composer's post-install-cmd/post-update-cmd": `composer.json` solo copiaba `pre-commit`, nunca
+  `pre-push`, así que un `git clone` + `composer install` fresco nunca lo instalaba. Corregido
+  `composer.json` (`post-install-cmd`/`post-update-cmd`) para copiar `pre-push` con el mismo
+  mecanismo/permisos que `pre-commit` (`chmod +x` + `[ -d .git/hooks ] && cp ... || true`).
+  Verificado borrando `.git/hooks/pre-push` y corriendo `composer install`: se recrea con 0755 y
+  contenido idéntico al de la raíz. El comentario de cabecera del hook ya no hacía falta tocarlo —
+  ahora es verídico. Contenido del hook (no-op `exit 0`) sin cambios, como corresponde.
+
 - **CORE-03 + fix de test dependiente del entorno (2026-08-06)** — dos cambios acotados, hechos
   mientras se migraba el resto de la flota; no alteran la decisión de congelar este repo.
   - `app/Config/Api.php` pasa de 148 líneas copiadas verbatim (byte-idénticas a las de cms, catalog
