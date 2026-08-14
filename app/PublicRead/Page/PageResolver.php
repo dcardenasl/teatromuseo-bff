@@ -57,9 +57,15 @@ final class PageResolver
             }
         }
 
-        $entryPage = $this->entryFor($locale, $path);
+        $collectionCandidates = $this->collectionCandidatesFor($locale, $path);
+        $entryPage = $this->entryFor($locale, $collectionCandidates);
         if ($entryPage !== null) {
             return $this->pageResult($entryPage, 'collection_entry');
+        }
+
+        $fallbackPage = $this->fallbackFor($locale, $collectionCandidates);
+        if ($fallbackPage !== null) {
+            return $this->pageResult($fallbackPage, 'collection_fallback_index');
         }
 
         return ['outcome' => 'not_found', 'redirect' => null, 'page' => null];
@@ -130,13 +136,17 @@ final class PageResolver
     }
 
     /** @return array<string, mixed>|null */
-    private function entryFor(string $locale, string $path): ?array
+    /**
+     * @param list<array{collection: array<string, mixed>, remainder: string}> $candidates
+     * @return array<string, mixed>|null
+     */
+    private function entryFor(string $locale, array $candidates): ?array
     {
-        if (! $this->collections instanceof CollectionReaderInterface || ! $this->entries instanceof EntryReaderInterface) {
+        if (! $this->entries instanceof EntryReaderInterface) {
             return null;
         }
 
-        foreach ($this->collectionCandidates($this->collections->list($locale), $locale, $path) as $candidate) {
+        foreach ($candidates as $candidate) {
             if ($candidate['remainder'] === '') {
                 continue;
             }
@@ -163,6 +173,78 @@ final class PageResolver
         }
 
         return null;
+    }
+
+    /**
+     * @param list<array{collection: array<string, mixed>, remainder: string}> $candidates
+     * @return array<string, mixed>|null
+     */
+    private function fallbackFor(string $locale, array $candidates): ?array
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate['remainder'] !== '') {
+                continue;
+            }
+
+            $collection = $candidate['collection'];
+            if (is_array($collection['index_page'] ?? null)) {
+                continue;
+            }
+
+            $collectionKey = trim((string) ($collection['collection_key'] ?? ''));
+            if ($collectionKey === '') {
+                continue;
+            }
+            $title = trim((string) ($collection['listing_title'] ?? ''));
+            if ($title === '') {
+                $title = trim((string) ($collection['name'] ?? ''));
+            }
+            $intro = trim((string) ($collection['listing_intro'] ?? ''));
+            if ($intro === '') {
+                $intro = trim((string) ($collection['description'] ?? ''));
+            }
+            $collectionPath = $this->collectionPath($collection, $locale);
+            $localizedUrls = $this->localizedCollectionUrls($collection);
+
+            return [
+                'page_type' => 'collection_fallback_index',
+                'title' => $title,
+                'excerpt' => $intro,
+                'showPageHeading' => true,
+                'pageTitle' => $title,
+                'metaDescription' => $intro,
+                'canonicalUrl' => '/' . $locale . '/' . $collectionPath,
+                'ogImage' => '',
+                'metaRobots' => 'index, follow',
+                'schemaData' => null,
+                'localized_urls' => $localizedUrls,
+                'blocks' => [[
+                    'block_key' => 'collection_listing',
+                    'block_config' => [
+                        'collection_id' => (int) ($collection['id'] ?? 0),
+                        'collection_key' => $collectionKey,
+                        'items_limit' => 12,
+                        'order_by' => 'published_at',
+                        'order_direction' => 'desc',
+                        'layout_variant' => 'cards',
+                    ],
+                    'block_data' => [],
+                    'children' => [],
+                ]],
+            ];
+        }
+
+        return null;
+    }
+
+    /** @return list<array{collection: array<string, mixed>, remainder: string}> */
+    private function collectionCandidatesFor(string $locale, string $path): array
+    {
+        if (! $this->collections instanceof CollectionReaderInterface) {
+            return [];
+        }
+
+        return $this->collectionCandidates($this->collections->list($locale), $locale, $path);
     }
 
     /**
@@ -212,6 +294,25 @@ final class PageResolver
         }
 
         return trim((string) ($collection['collection_key'] ?? ''), '/');
+    }
+
+    /** @param array<string, mixed> $collection
+     *  @return array<string, string>
+     */
+    private function localizedCollectionUrls(array $collection): array
+    {
+        $localizedSlugs = $collection['localized_slugs'] ?? null;
+        $locales = is_array($localizedSlugs) ? array_keys($localizedSlugs) : [];
+        $urls = [];
+        foreach ($locales as $locale) {
+            $locale = (string) $locale;
+            $path = $this->collectionPath($collection, $locale);
+            if ($path !== '') {
+                $urls[$locale] = '/' . $locale . '/' . $path;
+            }
+        }
+
+        return $urls;
     }
 
     /** @return array{outcome: 'redirect', redirect: array{path: string, status: int}, page: null} */

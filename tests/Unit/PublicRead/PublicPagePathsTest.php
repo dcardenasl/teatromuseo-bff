@@ -162,6 +162,35 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame([], $result['page']['related_entries']);
     }
 
+    public function testSynthesizesTheFallbackCollectionIndexWhenNoCmsIndexExists(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $collections = $this->createMock(CollectionReaderInterface::class);
+        $collections->expects(self::once())->method('list')->with('es')->willReturn([
+            [
+                'id' => 4,
+                'collection_key' => 'cartelera',
+                'name' => 'Cartelera',
+                'listing_intro' => 'Obras publicadas.',
+                'localized_slugs' => ['es' => 'cartelera', 'en' => 'billboard'],
+                'index_page' => null,
+            ],
+        ]);
+        $entries = $this->createMock(EntryReaderInterface::class);
+
+        $result = (new PageResolver($redirects, $pages, $collections, $entries))->resolve('es', 'cartelera');
+
+        self::assertSame('collection_fallback_index', $result['page']['page_type']);
+        self::assertSame('Cartelera', $result['page']['title']);
+        self::assertSame('/es/cartelera', $result['page']['canonicalUrl']);
+        self::assertSame('/en/cartelera', $result['page']['localized_urls']['en']);
+        self::assertSame('collection_listing', $result['page']['blocks'][0]['block_key']);
+        self::assertSame(12, $result['page']['blocks'][0]['block_config']['items_limit']);
+    }
+
     /** @return iterable<string, array{string, string, ?string}> */
     public static function aliasProvider(): iterable
     {

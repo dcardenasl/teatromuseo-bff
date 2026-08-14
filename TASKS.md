@@ -13,6 +13,18 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
+  2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
+  una colección sin `index_page`, preservando el shape de Web: título/intro,
+  canonical y URLs localizadas, más un bloque `collection_listing` con
+  `items_limit=12`, `published_at desc` y variante `cards`. La lectura de
+  colecciones se comparte entre el intento de entry y el fallback. Verificado
+  con 16 tests / 55 assertions focales, `composer quality` completo (161
+  tests / 441 assertions, 1 skip, PHPStan sin errores, CS-Fixer y arquitectura
+  verdes). El smoke real de `/es/cartelera` confirmó la precedencia de su CMS
+  `cms_page`; el fixture local no contiene una colección sin página CMS para
+  ejecutar el caso sintético vía HTTP sin alterar datos.
+
 - [x] **BFF-PAGE-04 — Entrada de colección + `related()`.** Cerrada
   2026-08-14. `PageResolver` ahora identifica el prefijo localizado de una
   colección, resuelve la entrada por slug y adjunta `collection` y
@@ -174,10 +186,6 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-05 — Índice de colección de respaldo.** Paso 5 del
-  algoritmo de Web (`renderFallbackCollectionIndex()`): sintetiza una página
-  `collection_fallback_index` cuando una colección no tiene página CMS
-  dedicada.
 - [ ] **BFF-PAGE-06 — `BlockTreeResolver`.** Puerto completo del pipeline
   `BlockPlanCollector`/`BlockRequestPlanner`/`BlockDependencyResolver`/
   `ListQueryBuilder`/`BlockResultMaterializer` de Web — mismo algoritmo,
