@@ -36,13 +36,34 @@
   (164 tests / 459 assertions, 1 skip, 1 deprecation, PHPStan sin errores,
   CS-Fixer y arquitectura verdes) y smoke read-only real sobre la home CMS:
   los tres bloques dinámicos de Event/CMS devolvieron `200` con 3 elementos
-  cada uno. El endpoint final sigue reservado para BFF-PAGE-07.
+  cada uno.
 
-## 🔴 En progreso
+- [x] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
+  Cerrada 2026-08-14. `GET /api/v1/public-read/{locale}/page-resolve/{route}`
+  compone routing, layout y `block_context` en una respuesta; la ruta usa
+  `webappkey`, conserva redirects `301/302` y devuelve `404` para
+  `not_found`. Verificado con la matriz real `inicio`, `cartelera`,
+  `museo/coleccion`, `contacto`, `historia`, `cursos`, una entrada de
+  colección, ruta inexistente y redirect `/public/es` — todos los estados
+  esperados. La comparación real BFF/Web sobre `home` dejó
+  `page_equal`, `layout_equal`, `block_context_equal`, `meta_equal` y
+  `source_state_equal` en `true`, excluyendo únicamente `generated_at` y la
+  normalización intencional `source_page_type` + `page_type=cms_page`.
+  `composer quality`: 164 tests / 459 assertions, 1 skip, 1 deprecation,
+  PHPStan sin errores, CS-Fixer y arquitectura verdes. Commit de paridad:
+  `579a6a0`.
 
-- [ ] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
-  En progreso 2026-08-14. Falta cablear routing, layout, block context y la
-  ruta pública única para cerrar la paridad end-to-end.
+- [x] **BFF-PAGE-08 — Preview extendido a bloques.** Cerrada 2026-08-14.
+  El preview HMAC verificado por el controlador ahora se propaga a la
+  resolución de entries y a los bloques CMS (`BlockTreeResolver` →
+  `PublicReadEntryReader`), que omiten los filtros de publicación solo en el
+  camino firmado; Catalog/Event y forms permanecen fuera del preview CMS.
+  Verificado con 2 pruebas nuevas de forwarding, 21 tests / 86 assertions
+  focales del routing/bloques, quality BFF completo (166 tests / 472
+  assertions, 1 skip, 1 deprecation, PHPStan/CS-Fixer/arquitectura verdes) y
+  smoke HTTP real: plantilla CMS `template_event_item` visible con firma
+  válida (`page`, `cms_page`, `source_page_type=template_event_item`) y
+  `not_found` con firma inválida.
 
 - [x] **BFF-PAGE-04 — Entrada de colección + `related()`.** Cerrada
   2026-08-14. `PageResolver` ahora identifica el prefijo localizado de una
@@ -205,17 +226,6 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
-  Arma la respuesta con la forma de `PageDeliveryResponse` (ver contrato en
-  el plan), con aislamiento de fallos por bloque (`ok`/`status`/`data`/
-  `meta`/`stale` por entrada de `block_prefetch`, nunca `5xx` por el fallo
-  de una sola fuente). Ruta nueva `public-read/{locale}/page-resolve/{route}`
-  en `app/Config/Routes/v1/public.php`, filtro `webappkey`.
-- [ ] **BFF-PAGE-08 — Preview extendido a bloques.** El HMAC ya portado a
-  `page-bootstrap` (`PreviewToken`) se extiende a bloques que referencian
-  contenido no publicado (p. ej. una entrada en preview dentro de un
-  `collection_grid`); mismo secreto, mismo contrato de firma, misma caída a
-  `preview=false` sin secreto o firma inválida.
 - [ ] **BFF-PAGE-09 — Fase 3: retiro del HTTP público de `layout`/
   `page-bootstrap`.** Solo tras verificar Fase 2 estable en Web (mismo gate
   que `WEB-BFF-04`). Borra el controlador/rutas que exponían `layout` y

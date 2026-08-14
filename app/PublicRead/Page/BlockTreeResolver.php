@@ -45,6 +45,7 @@ final class BlockTreeResolver
         string $locale = 'es',
         array $query = [],
         array $seededItems = [],
+        bool $preview = false,
     ): array {
         $locale = strtolower(trim($locale));
         $collector = new BlockPlanCollector();
@@ -120,7 +121,7 @@ final class BlockTreeResolver
                     $mainQuery['collection'] = (string) ($plan['collection_key'] ?? '');
                 }
                 $plan['main_query'] = $mainQuery;
-                $plan['response'] = $this->normalize($this->list($sourceType, $locale, $mainQuery));
+                $plan['response'] = $this->normalize($this->list($sourceType, $locale, $mainQuery, $preview));
                 $plan['facet_data'] = $this->facets(
                     $plan,
                     $locale,
@@ -279,10 +280,10 @@ final class BlockTreeResolver
     }
 
     /** @param array<string, mixed> $query */
-    private function list(string $sourceType, string $locale, array $query): ApiResult
+    private function list(string $sourceType, string $locale, array $query, bool $preview): ApiResult
     {
         return match ($sourceType) {
-            'cms_collection' => $this->source->cmsEntries($locale, $query),
+            'cms_collection' => $this->source->cmsEntries($locale, $query, $preview),
             'catalog_items' => $this->source->catalogItems($locale, $query),
             'event_items' => $this->source->events($locale, $query),
             default => throw new \InvalidArgumentException('Unsupported block source.'),

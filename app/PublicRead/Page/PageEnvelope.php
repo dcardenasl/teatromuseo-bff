@@ -54,7 +54,7 @@ final readonly class PageEnvelope
 
         $page = $resolution['page'];
         $base['layout'] = $this->layout($locale);
-        $base['block_context'] = $this->blockContext($page, $locale, $query);
+        $base['block_context'] = $this->blockContext($page, $locale, $query, $preview);
         $stale = $this->hasStaleBlock($base['block_context']);
         $base['source'] = [
             'domain' => 'bff',
@@ -130,14 +130,14 @@ final readonly class PageEnvelope
      *  @param array<string, mixed> $query
      *  @return array<string, mixed>
      */
-    private function blockContext(array $page, string $locale, array $query): array
+    private function blockContext(array $page, string $locale, array $query, bool $preview): array
     {
         $blocks = is_array($page['blocks'] ?? null)
             ? array_values(array_filter($page['blocks'], static fn (mixed $block): bool => is_array($block)))
             : [];
 
         try {
-            return $this->blocks->resolve($blocks, $locale, $query);
+            return $this->blocks->resolve($blocks, $locale, $query, [], $preview);
         } catch (Throwable) {
             return [
                 'block_prefetch' => [],

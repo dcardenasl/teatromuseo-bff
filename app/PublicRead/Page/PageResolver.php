@@ -58,7 +58,7 @@ final class PageResolver
         }
 
         $collectionCandidates = $this->collectionCandidatesFor($locale, $path);
-        $entryPage = $this->entryFor($locale, $collectionCandidates);
+        $entryPage = $this->entryFor($locale, $collectionCandidates, $preview);
         if ($entryPage !== null) {
             return $this->pageResult($entryPage, 'collection_entry');
         }
@@ -140,7 +140,7 @@ final class PageResolver
      * @param list<array{collection: array<string, mixed>, remainder: string}> $candidates
      * @return array<string, mixed>|null
      */
-    private function entryFor(string $locale, array $candidates): ?array
+    private function entryFor(string $locale, array $candidates, bool $preview): ?array
     {
         if (! $this->entries instanceof EntryReaderInterface) {
             return null;
@@ -156,14 +156,18 @@ final class PageResolver
             if ($collectionKey === '') {
                 continue;
             }
-            $result = $this->entries->show($locale, $collectionKey, $candidate['remainder'], []);
+            $result = $preview
+                ? $this->entries->show($locale, $collectionKey, $candidate['remainder'], [], true)
+                : $this->entries->show($locale, $collectionKey, $candidate['remainder'], []);
             $entry = $result->body['data'] ?? null;
             if (($result->body['ok'] ?? false) !== true || ! is_array($entry)) {
                 continue;
             }
 
             try {
-                $entry['related_entries'] = $this->entries->related($locale, $collectionKey, $entry, 3);
+                $entry['related_entries'] = $preview
+                    ? $this->entries->related($locale, $collectionKey, $entry, 3, true)
+                    : $this->entries->related($locale, $collectionKey, $entry, 3);
             } catch (Throwable) {
                 $entry['related_entries'] = [];
             }

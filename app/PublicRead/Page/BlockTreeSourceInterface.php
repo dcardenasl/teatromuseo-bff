@@ -19,7 +19,7 @@ interface BlockTreeSourceInterface
     public function collections(string $locale): array;
 
     /** @param array<string, mixed> $query */
-    public function cmsEntries(string $locale, array $query): ApiResult;
+    public function cmsEntries(string $locale, array $query, bool $preview = false): ApiResult;
 
     /** @return list<array<string, mixed>> */
     public function cmsCategories(string $locale, string $collectionKey): array;

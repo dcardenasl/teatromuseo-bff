@@ -162,6 +162,28 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame([], $result['page']['related_entries']);
     }
 
+    public function testPreviewForwardsToCollectionEntryAndRelatedReads(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $collections = $this->createMock(CollectionReaderInterface::class);
+        $collections->method('list')->willReturn([[
+            'collection_key' => 'news',
+            'index_page' => ['localized_slugs' => ['es' => 'noticias']],
+        ]]);
+        $entries = $this->createMock(EntryReaderInterface::class);
+        $entries->expects(self::once())->method('show')->with('es', 'news', 'draft', [], true)->willReturn(
+            new ApiResult(['ok' => true, 'data' => ['slug' => 'draft']], 200),
+        );
+        $entries->expects(self::once())->method('related')->with('es', 'news', ['slug' => 'draft'], 3, true)->willReturn([]);
+
+        $result = (new PageResolver($redirects, $pages, $collections, $entries))->resolve('es', 'noticias/draft', true);
+
+        self::assertSame('collection_entry', $result['page']['page_type']);
+    }
+
     public function testSynthesizesTheFallbackCollectionIndexWhenNoCmsIndexExists(): void
     {
         $redirects = $this->createMock(RedirectReaderInterface::class);

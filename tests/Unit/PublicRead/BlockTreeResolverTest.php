@@ -90,6 +90,20 @@ final class BlockTreeResolverTest extends TestCase
         self::assertSame([['id' => 4, 'slug' => 'seeded', 'name' => 'Seeded item']], $result['block_prefetch'][0]['data']);
         self::assertSame(0, $source->catalogItemCalls);
     }
+
+    public function testPreviewIsForwardedToCmsCollectionBlocks(): void
+    {
+        $source = new FakeBlockTreeSource();
+
+        (new BlockTreeResolver($source))->resolve([
+            [
+                'block_key' => 'collection_grid',
+                'block_config' => ['source_type' => 'cms_collection', 'collection_key' => 'news'],
+            ],
+        ], 'es', [], [], true);
+
+        self::assertTrue($source->cmsPreview);
+    }
 }
 
 /** @internal Test source for the direct block composition port. */
@@ -99,14 +113,17 @@ final class FakeBlockTreeSource implements BlockTreeSourceInterface
     public array $lastCatalogQuery = [];
     public int $catalogItemCalls = 0;
     public bool $failEvents = false;
+    public bool $cmsPreview = false;
 
     public function collections(string $locale): array
     {
         return [['id' => 10, 'collection_key' => 'news']];
     }
 
-    public function cmsEntries(string $locale, array $query): ApiResult
+    public function cmsEntries(string $locale, array $query, bool $preview = false): ApiResult
     {
+        $this->cmsPreview = $preview;
+
         return self::success([['id' => 1]], ['total' => 1]);
     }
 

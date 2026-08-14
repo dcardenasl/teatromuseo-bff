@@ -33,7 +33,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
     }
 
     /** @param list<string> $fields */
-    public function index(PublicReadEntryRequestDTO $request, array $fields): ApiResult
+    public function index(PublicReadEntryRequestDTO $request, array $fields, bool $preview = false): ApiResult
     {
         [$languageId, $defaultLanguageId, $languageCodes] = $this->languageIds($request->locale);
         $collectionQuery = $this->db->table('cms_collections')->select('id')->where('collection_key', $request->collection)->where('is_active', 1)->get();
@@ -41,7 +41,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
         if (! is_array($collection)) {
             return $this->notFound($request->locale, 'Collection not found.');
         }
-        $builder = $this->publicEntriesBuilder((int) $collection['id'], $request->toArray(), $languageId, $defaultLanguageId);
+        $builder = $this->publicEntriesBuilder((int) $collection['id'], $request->toArray(), $languageId, $defaultLanguageId, $preview);
         $countBuilder = clone $builder;
         $total = (int) $countBuilder->countAllResults();
         $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at');
@@ -65,7 +65,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
     }
 
     /** @param list<string> $fields */
-    public function show(string $locale, string $collectionKey, string $slug, array $fields): ApiResult
+    public function show(string $locale, string $collectionKey, string $slug, array $fields, bool $preview = false): ApiResult
     {
         [$languageId, $defaultLanguageId, $languageCodes] = $this->languageIds($locale);
         $collectionQuery = $this->db->table('cms_collections')->select('id')->where('collection_key', $collectionKey)->where('is_active', 1)->get();
@@ -76,10 +76,13 @@ final class PublicReadEntryReader implements EntryReaderInterface
         $builder = $this->db->table('cms_entries e')->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at')
             ->join('cms_entry_translations et_lookup', 'et_lookup.entry_id = e.id')
             ->where('et_lookup.slug', trim($slug, '/'))->whereIn('et_lookup.language_id', array_values(array_filter([$languageId, $defaultLanguageId])))
-            ->where('e.collection_id', (int) $collection['id'])->where('e.workflow_status', 'published')->where('e.deleted_at', null)
-            ->groupStart()->where('e.published_at', null)->orWhere('e.published_at <=', date('Y-m-d H:i:s'))->groupEnd()
-            ->groupStart()->where('e.scheduled_at', null)->orWhere('e.scheduled_at <=', date('Y-m-d H:i:s'))->groupEnd()
+            ->where('e.collection_id', (int) $collection['id'])->where('e.deleted_at', null)
             ->orderBy('et_lookup.language_id', 'ASC')->limit(1);
+        if (! $preview) {
+            $builder->where('e.workflow_status', 'published')
+                ->groupStart()->where('e.published_at', null)->orWhere('e.published_at <=', date('Y-m-d H:i:s'))->groupEnd()
+                ->groupStart()->where('e.scheduled_at', null)->orWhere('e.scheduled_at <=', date('Y-m-d H:i:s'))->groupEnd();
+        }
         $query = $builder->get();
         $rows = $query !== false ? array_values($query->getResultArray()) : [];
         if ($rows === []) {
@@ -98,7 +101,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
      * @param array<string, mixed> $entry
      * @return list<array<string, mixed>>
      */
-    public function related(string $locale, string $collectionKey, array $entry, int $limit = 3): array
+    public function related(string $locale, string $collectionKey, array $entry, int $limit = 3, bool $preview = false): array
     {
         $limit = max(0, $limit);
         if ($limit === 0) {
@@ -112,7 +115,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
 
         $related = [];
         if ($categorySlug !== '') {
-            $related = $this->relatedList($locale, $collectionKey, $fields, $limit + 1, $categorySlug);
+            $related = $this->relatedList($locale, $collectionKey, $fields, $limit + 1, $categorySlug, $preview);
             $related = array_values(array_filter(
                 $related,
                 static fn (array $candidate): bool => (string) ($candidate['slug'] ?? '') !== $currentSlug,
@@ -126,7 +129,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
         }
 
         if (count($related) < $limit) {
-            $candidates = $this->relatedList($locale, $collectionKey, $fields, $limit + 1);
+            $candidates = $this->relatedList($locale, $collectionKey, $fields, $limit + 1, null, $preview);
             $knownSlugs = array_fill_keys(array_map(
                 static fn (array $candidate): string => (string) ($candidate['slug'] ?? ''),
                 $related,
@@ -152,13 +155,16 @@ final class PublicReadEntryReader implements EntryReaderInterface
 
     /** @return \CodeIgniter\Database\BaseBuilder */
     /** @param array<string, mixed> $request */
-    private function publicEntriesBuilder(int $collectionId, array $request, int $languageId, int $defaultLanguageId): \CodeIgniter\Database\BaseBuilder
+    private function publicEntriesBuilder(int $collectionId, array $request, int $languageId, int $defaultLanguageId, bool $preview = false): \CodeIgniter\Database\BaseBuilder
     {
         $builder = $this->db->table('cms_entries e')
             ->join('(SELECT entry_id, COALESCE(MAX(CASE WHEN language_id = ' . $languageId . ' THEN title END), MAX(CASE WHEN language_id = ' . $defaultLanguageId . ' THEN title END)) AS title FROM cms_entry_translations WHERE language_id IN (' . $languageId . ', ' . $defaultLanguageId . ') GROUP BY entry_id) et_order', 'et_order.entry_id = e.id', 'left')
-            ->where('e.collection_id', $collectionId)->where('e.workflow_status', 'published')->where('e.deleted_at', null)
-            ->groupStart()->where('e.published_at', null)->orWhere('e.published_at <=', date('Y-m-d H:i:s'))->groupEnd()
-            ->groupStart()->where('e.scheduled_at', null)->orWhere('e.scheduled_at <=', date('Y-m-d H:i:s'))->groupEnd();
+            ->where('e.collection_id', $collectionId)->where('e.deleted_at', null);
+        if (! $preview) {
+            $builder->where('e.workflow_status', 'published')
+                ->groupStart()->where('e.published_at', null)->orWhere('e.published_at <=', date('Y-m-d H:i:s'))->groupEnd()
+                ->groupStart()->where('e.scheduled_at', null)->orWhere('e.scheduled_at <=', date('Y-m-d H:i:s'))->groupEnd();
+        }
         $categoryId = $request['category_id'] ?? null;
         if ($categoryId !== null && $categoryId !== '') {
             $builder->where('EXISTS (SELECT 1 FROM cms_entry_categories ec WHERE ec.entry_id = e.id AND ec.category_id = ' . (int) $categoryId . ')', null, false);
@@ -200,7 +206,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
      * @param list<string> $fields
      * @return list<array<string, mixed>>
      */
-    private function relatedList(string $locale, string $collectionKey, array $fields, int $limit, ?string $category = null): array
+    private function relatedList(string $locale, string $collectionKey, array $fields, int $limit, ?string $category = null, bool $preview = false): array
     {
         [$languageId, $defaultLanguageId, $languageCodes] = $this->languageIds($locale);
         $collectionQuery = $this->db->table('cms_collections')->select('id')->where('collection_key', $collectionKey)->where('is_active', 1)->get();
@@ -217,7 +223,7 @@ final class PublicReadEntryReader implements EntryReaderInterface
             'filter_by' => null,
             'filter_value' => null,
             'filter_operator' => 'equals',
-        ], $languageId, $defaultLanguageId);
+        ], $languageId, $defaultLanguageId, $preview);
         $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at')
             ->orderBy('e.published_at', 'DESC')
             ->orderBy('e.created_at', 'DESC')

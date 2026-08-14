@@ -32,12 +32,12 @@ final readonly class PublicReadBlockTreeSource implements BlockTreeSourceInterfa
         return $this->cms->collections->list($locale);
     }
 
-    public function cmsEntries(string $locale, array $query): ApiResult
+    public function cmsEntries(string $locale, array $query, bool $preview = false): ApiResult
     {
         $query['locale'] = $locale;
         $dto = $this->requestDtos->make(PublicReadEntryRequestDTO::class, $query);
 
-        return $this->cms->entries->index($dto, $this->fields($query));
+        return $this->cms->entries->index($dto, $this->fields($query), $preview);
     }
 
     public function cmsCategories(string $locale, string $collectionKey): array

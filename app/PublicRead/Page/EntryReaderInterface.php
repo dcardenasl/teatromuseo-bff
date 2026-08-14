@@ -10,11 +10,11 @@ use dcardenasl\Ci4ApiCore\Support\ApiResult;
 interface EntryReaderInterface
 {
     /** @param list<string> $fields */
-    public function show(string $locale, string $collectionKey, string $slug, array $fields): ApiResult;
+    public function show(string $locale, string $collectionKey, string $slug, array $fields, bool $preview = false): ApiResult;
 
     /**
      * @param array<string, mixed> $entry
      * @return list<array<string, mixed>>
      */
-    public function related(string $locale, string $collectionKey, array $entry, int $limit = 3): array;
+    public function related(string $locale, string $collectionKey, array $entry, int $limit = 3, bool $preview = false): array;
 }
