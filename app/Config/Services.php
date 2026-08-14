@@ -132,4 +132,22 @@ class Services extends BaseService
 
         return \App\PublicRead\PublicReadContainer::catalogFacets();
     }
+
+    public static function publicReadEvents(bool $getShared = true): \App\PublicRead\Event\PublicReadEventReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadEvents');
+        }
+
+        return \App\PublicRead\PublicReadContainer::events();
+    }
+
+    public static function publicReadEventTypes(bool $getShared = true): \App\PublicRead\EventTypeReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadEventTypes');
+        }
+
+        return \App\PublicRead\PublicReadContainer::eventTypes();
+    }
 }

@@ -17,6 +17,8 @@ $routes->group('public-read', ['namespace' => '\\App\\Controllers\\Api\\V1\\Publ
     $routes->get('(:segment)/entries/(:segment)/(:any)', 'CmsPublicReadController::entry/$1/$2/$3');
     $routes->get('(:segment)/collection-items', 'CatalogPublicReadController::index/$1');
     $routes->get('(:segment)/collection-items/(:any)', 'CatalogPublicReadController::item/$1/$2');
+    $routes->get('(:segment)/events', 'EventPublicReadController::index/$1');
+    $routes->get('(:segment)/events/(:any)', 'EventPublicReadController::item/$1/$2');
 });
 
 $routes->group('public', ['namespace' => '\\App\\Controllers\\Api\\V1\\PublicRead', 'filter' => $publicReadFilters], static function ($routes): void {
@@ -30,6 +32,7 @@ $routes->group('public', ['namespace' => '\\App\\Controllers\\Api\\V1\\PublicRea
     $routes->get('(:segment)/tags/(:segment)', 'CmsPublicReadController::tags/$1/$2');
     $routes->get('(:segment)/forms/(:segment)', 'CmsPublicReadController::form/$1/$2');
     $routes->get('redirects/(.*)', 'CmsPublicReadController::redirect/$1');
+    $routes->get('events/types', 'EventPublicReadController::types');
 });
 
 // Template-generated public passthrough fallback. Explicit public-read routes

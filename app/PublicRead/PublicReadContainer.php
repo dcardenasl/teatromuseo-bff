@@ -20,6 +20,7 @@ use App\PublicRead\Cms\PublicReadTagReader;
 use App\PublicRead\Cms\PublicRedirectResolver;
 use App\PublicRead\Cms\SlugRouter;
 use App\PublicRead\Cms\TranslationResolver;
+use App\PublicRead\Event\PublicReadEventReader;
 use App\PublicRead\Support\DirectDbFileMetaResolver;
 use CodeIgniter\Database\BaseConnection;
 
@@ -79,6 +80,21 @@ final class PublicReadContainer
     public static function catalogFacets(): CatalogFacetReader
     {
         return new CatalogFacetReader(self::database('catalog_readonly'));
+    }
+
+    public static function events(): PublicReadEventReader
+    {
+        return new PublicReadEventReader(
+            self::database('event_readonly'),
+            self::fileMetaResolver(),
+            (string) env('EVENT_SCHEDULE_TIMEZONE', 'America/Santiago'),
+            self::fallbackLocale(),
+        );
+    }
+
+    public static function eventTypes(): EventTypeReader
+    {
+        return new EventTypeReader(self::database('event_readonly'));
     }
 
     private static function fileMetaResolver(): DirectDbFileMetaResolver
