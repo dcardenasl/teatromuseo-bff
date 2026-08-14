@@ -6,7 +6,9 @@ This is the stateless Backend-for-Frontend gateway, served locally on port
 `8188`. It fronts decoupled clients such as SPAs and mobile applications and
 forwards requests to the Hub (`8180`) or configured domain apps.
 
-- No database, migrations, sessions, users, or persistent audit data.
+- No owned/write database, migrations, sessions, users, or persistent audit
+  data. The only database exception is `app/PublicRead/**`, which may use the
+  four named SELECT-only `BaseConnection` groups and never models or writes.
 - The BFF never decodes JWTs or holds the JWT secret.
 - It forwards the client's `Authorization` header to upstream services.
 - `IntrospectAuthFilter` is an opt-in route filter that asks the Hub to

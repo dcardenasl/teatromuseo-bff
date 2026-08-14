@@ -16,7 +16,14 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
 
 ## Boundaries
 
-- **No database.** No migrations, no models, no repositories.
+- **No owned/write database.** No migrations, no models, no repositories or
+  writes. The only exception is the direct public-read seam below.
+- **Direct public-read seam.** `app/PublicRead/**` may use the four named
+  `BaseConnection` groups (`cms_readonly`, `catalog_readonly`,
+  `event_readonly`, `hub_readonly`) for SELECT-only reads. It must never use a
+  Model, `model()`, or a write query; `Config\Database::$default` remains the
+  SQLite compatibility stub. This exception is local to `teatromuseo-bff` and
+  does not change the `ci4-bff-starter` template contract.
 - **No JWT validation.** The BFF forwards the client's `Authorization`
   header to the upstream hub/domain. The upstream validates and either
   returns the response or a 401 — the BFF just relays.
@@ -25,7 +32,8 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
 - **No user storage.** Users live in the hub.
 
 The BFF's job is: CORS, request shaping, response aggregation across
-hub + domain, and optional service-token-based admin calls.
+hub + domain, optional service-token-based admin calls, and the Web's
+cross-domain public-read surface.
 
 ## Essential commands
 
@@ -204,6 +212,7 @@ new endpoint isn't annotated under `app/Documentation/`.
 | `BFF_ALLOWED_ORIGINS` | Comma-separated CORS allow-list. Empty in production = throw. |
 | `encryption.key` | CI4 encryption key (32 bytes after `hex2bin:` decode) |
 | `hub.appCode`, `hub.apiKey` | Only needed if the BFF uses a service token for M2M calls |
+| `CMS_READONLY_DB_*`, `CATALOG_READONLY_DB_*`, `EVENT_READONLY_DB_*`, `HUB_READONLY_DB_*` | SELECT-only credentials for the isolated `app/PublicRead/**` seam |
 
 ## Common pitfalls
 
