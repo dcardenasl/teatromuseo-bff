@@ -115,6 +115,15 @@ class Services extends BaseService
         );
     }
 
+    public static function publicReadDatabaseHealth(bool $getShared = true): \App\PublicRead\ReadDatabaseHealth
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadDatabaseHealth');
+        }
+
+        return new \App\PublicRead\ReadDatabaseHealth();
+    }
+
     public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
     {
         if ($getShared) {
