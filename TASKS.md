@@ -13,6 +13,39 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-PAGE-01 — Contrato `page.page_type` y aliases.** Cerrada
+  2026-08-14 como Fase 0. La comparación contra
+  `teatromuseo-web/app/Controllers/PageController.php`,
+  `BasePublicWebController.php`, `PageDeliveryResponse.php` y las vistas
+  confirmó tres discriminantes de página válida: `cms_page`,
+  `collection_entry` y `collection_fallback_index`; el cuarto desenlace es
+  `outcome=not_found` con `page=null`, preservando el contrato existente de
+  `PageDeliveryResponse` y evitando publicar un snapshot sintético de 404.
+  Las páginas CMS deben conservar además su `source_page_type` original
+  (`home`, `events`, `catalog_listing`, `collection_index`, `generic`, etc.)
+  porque la capa de presentación lo usa para canonicalización y SEO. Para
+  entries la página debe incluir los campos que consume
+  `collection/show` —traducción, colección, imágenes, taxonomías, bloques,
+  SEO, URLs localizadas— más `related_entries`; el fallback debe conservar el
+  shape de `page` + `blocks` que hoy produce `renderFallbackCollectionIndex()`.
+  La matriz de canonicalización portada como referencia de lectura cubre:
+  homepage (`home`, `inicio`, `accueil` y el segmento localizado), eventos
+  (`cartelera`, `events`, `programme`, `eventos`, `programming`,
+  `programmation`, `programacao`), catálogo (`museo/coleccion`,
+  `museum/collection`, `musee/collection`, `museu/colecao`), contacto
+  (`contacto`, `contact`, `contato`), historia (`historia`, `history`,
+  `histoire`, `nossa-historia`) y teatroescuela (`cursos`, `teatroescuela`,
+  `theaterschool`, `theatreecole`, `escola-de-teatro`). Se conserva también
+  el redirect especial de `public/{locale}` a la homepage; los destinos
+  externos no se canonicalizan.
+
+- [x] **BFF-PAGE-02 — ADR-008.** Cerrada 2026-08-14. Revisada contra el
+  contrato confirmado: documenta el endpoint `page-resolve`, la relación
+  1:1 con `PageDeliveryResponse`, `block_context` por bloque y el aislamiento
+  `ok`/`error`/`stale` sin convertir un fallo de Catalog/Event en `5xx`. La
+  Fase 1 puede reutilizar los lectores existentes sin modificar el sistema
+  de snapshots.
+
 - [x] **BFF-DB-10 — Contrato completo de listados CMS en la lectura directa.**
   Cerrada después del smoke real de Fase 2: el BFF ahora acepta y aplica
   `filter_by`, `filter_value`, `filter_operator`, `order_by=field:*`,
@@ -100,6 +133,55 @@
   despliegue, no código.
 
 ## 🟡 Próximo
+
+### El BFF resuelve la página pública completa (2026-08-14) — ver `../docs/plan/2026-08-14-plan-bff-page-resolution.md`
+
+Extiende la lectura directa (abajo, ya cerrada) al objetivo final: el BFF
+compone routing + layout + bloques de una página en una sola respuesta, para
+que `teatromuseo-web` haga una sola llamada HTTP por página en vez de hasta 2
+en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
+(`../docs/adr/008-bff-full-page-resolution.md`). Reutiliza tal cual los
+lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
+lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
+
+- [ ] **BFF-PAGE-03 — `PageResolver`: routing sin bloques.** Nuevo
+  `app/PublicRead/Page/PageResolver.php`. Cubre redirect (reusa
+  `PublicRedirectResolver`/`RedirectReader`) → página CMS por slug (reusa
+  `PageReader`) → alias conocidos, sin bloques todavía. Verificar paso a
+  paso contra `PageController::resolve()` de Web (pasos 1-2 y homepage).
+- [ ] **BFF-PAGE-04 — Entrada de colección + `related()`.** Extiende
+  `PageResolver` con el paso 3 (entrada de colección por slug, reusando
+  `CollectionsReader`/`PublicReadEntryReader`). Agrega método `related()`
+  nuevo a `PublicReadEntryReader` (preferencia por categoría compartida +
+  relleno genérico + dedup, portado de `SiteEntryService::related()` de
+  Web), sobre la misma `publicEntriesBuilder()` que ya usa `index()`.
+- [ ] **BFF-PAGE-05 — Índice de colección de respaldo.** Paso 5 del
+  algoritmo de Web (`renderFallbackCollectionIndex()`): sintetiza una página
+  `collection_fallback_index` cuando una colección no tiene página CMS
+  dedicada.
+- [ ] **BFF-PAGE-06 — `BlockTreeResolver`.** Puerto completo del pipeline
+  `BlockPlanCollector`/`BlockRequestPlanner`/`BlockDependencyResolver`/
+  `ListQueryBuilder`/`BlockResultMaterializer` de Web — mismo algoritmo,
+  resolviendo dependencias entre bloques con llamadas a función (sin
+  oleadas HTTP, sin cap de paralelismo). Verificar bloque por bloque contra
+  el resultado que produce hoy el pipeline de Web para el mismo request.
+- [ ] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
+  Arma la respuesta con la forma de `PageDeliveryResponse` (ver contrato en
+  el plan), con aislamiento de fallos por bloque (`ok`/`status`/`data`/
+  `meta`/`stale` por entrada de `block_prefetch`, nunca `5xx` por el fallo
+  de una sola fuente). Ruta nueva `public-read/{locale}/page-resolve/{route}`
+  en `app/Config/Routes/v1/public.php`, filtro `webappkey`.
+- [ ] **BFF-PAGE-08 — Preview extendido a bloques.** El HMAC ya portado a
+  `page-bootstrap` (`PreviewToken`) se extiende a bloques que referencian
+  contenido no publicado (p. ej. una entrada en preview dentro de un
+  `collection_grid`); mismo secreto, mismo contrato de firma, misma caída a
+  `preview=false` sin secreto o firma inválida.
+- [ ] **BFF-PAGE-09 — Fase 3: retiro del HTTP público de `layout`/
+  `page-bootstrap`.** Solo tras verificar Fase 2 estable en Web (mismo gate
+  que `WEB-BFF-04`). Borra el controlador/rutas que exponían `layout` y
+  `page-bootstrap` por HTTP público; `PublicReadLayoutReader`/
+  `PublicReadPageBootstrapReader` se conservan como colaboradores internos
+  de `PageResolver`, no se borran como clase.
 
 ### BFF de lectura directa a 4 BDs (2026-08-13) — ver `../docs/plan/2026-08-13-plan-bff-completo.md`
 
