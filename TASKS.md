@@ -13,6 +13,34 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-DB-10 — Contrato completo de listados CMS en la lectura directa.**
+  Cerrada después del smoke real de Fase 2: el BFF ahora acepta y aplica
+  `filter_by`, `filter_value`, `filter_operator`, `order_by=field:*`,
+  `order_direction=UPCOMING` e `include=listing_content.*` sin volver a
+  depender del paquete Composer retirado. Se copió la proyección verificada
+  `EntryListingContentResolver` al namespace propio `App\PublicRead\Cms`, con
+  filtros y ordenamiento clasificados en SQL y sin interpolar campos arbitrarios;
+  la respuesta respeta además `fields` y evita serializar bloques completos
+  cuando la Web pide una proyección parcial. Las cuatro declaraciones de
+  paquetes fueron retiradas en los repositorios consumidores y las carpetas
+  físicas se eliminaron en `PKG-CLEANUP-01` después del grep cross-repo final.
+  También se portó el preview firmado de páginas (`CMS_PREVIEW_SECRET`) al
+  bootstrap y al detalle, con verificación HMAC en el borde y resolución de
+  páginas no publicadas solo cuando el token es válido; sin secreto o con firma
+  inválida el BFF cae a `preview=false` y no expone borradores.
+  Verificado contra MySQL Docker real: la query exacta de Web devuelve `200`,
+  12 entradas y las siete claves de `listing_content`; el filtro exacto devuelve
+  `200`, total 1; la selección parcial devuelve solo `image/date_fields` y el
+  preview inválido devuelve `200` con `meta.query.preview=false`.
+  `X-App-Key` ausente devuelve `401` y fecha inválida `422`.
+  `composer quality`: CS-Fixer limpio, PHPStan sin errores, StatelessArchitecture
+  verde, 145 tests / 386 assertions / 1 skipped. `/ready` quedó `ready` con
+  CMS/Catalog/Event/Hub-files `healthy`; `/health` solo reporta `degraded` por
+  el disco del host al 95,78%, no por las conexiones. **Bloqueo operativo
+  documentado:** `CMS_PREVIEW_SECRET` está vacío en dev y no se simula; antes
+  de retirar el HTTP público CMS en Fase 3 debe configurarse el mismo secreto
+  en BFF/CMS/Admin y repetirse una prueba positiva de preview firmado.
+
 - [x] **BFF-DB-09 — Errores de entrada no se convierten en `503`.** Cerrada
   durante la revisión de robustez: los `ValidationException` de los DTO de
   PublicRead ahora conservan el contrato estándar `422` con `errors`, y
@@ -35,9 +63,10 @@
   --minimal-changes` eliminó los cuatro paquetes del lock y `vendor` (solo
   actualizó CodeIgniter 4.7.3→4.7.4). El path-repo existente de
   `ci4-api-core` quedó no canónico para que su requisito estable pueda resolver
-  el paquete publicado durante un update limpio. Las carpetas físicas de
-  `/Users/davidcardenas/Developer/PHP/ci4-platform/` se conservaron porque los
-  tres dominios aún las declaran. Verificado: `composer quality` verde,
+  el paquete publicado durante un update limpio. Las carpetas físicas
+  superseded de `/Users/davidcardenas/Developer/PHP/ci4-platform/` se
+  eliminaron en `PKG-CLEANUP-01` después de retirar las declaraciones de los
+  tres dominios. Verificado: `composer quality` verde,
   PHPStan sin errores, StatelessArchitectureTest verde, 145 tests / 380
   assertions y CS-Fixer limpio. El smoke HTTP real contra Docker encontró que
   los tres DTO de listado se estaban construyendo sin `ValidationInterface`;
