@@ -77,8 +77,8 @@
   assertions, 1 skip, PHPStan sin errores, CS-Fixer y arquitectura verdes) y
   smoke directo contra MySQL local: `show()` `200` para
   `noticias/lanzamiento-del-libro-los-horribles` y `related()` devuelve tres
-  slugs distintos sin incluir el actual. El endpoint final `page-resolve` y
-  la composición de bloques siguen reservados para BFF-PAGE-07.
+  slugs distintos sin incluir el actual. La composición final queda verificada
+  en BFF-PAGE-07.
 
 - [x] **BFF-PAGE-03 — `PageResolver`: routing sin bloques.** Cerrada
   2026-08-14. Se añadió `PageResolver` con el orden verificable
@@ -92,8 +92,8 @@
   416 assertions, 1 skip, PHPStan sin errores, CS-Fixer y arquitectura
   verdes), y smoke HTTP real del lector existente
   `/api/v1/public-read/es/page-bootstrap/inicio` con `200` contra el stack
-  local y datos CMS. El endpoint final `page-resolve` y la paridad byte a byte
-  quedan explícitamente para BFF-PAGE-07.
+  local y datos CMS. La ruta final `page-resolve` y la paridad byte a byte
+  quedan cerradas en BFF-PAGE-07.
 
 - [x] **BFF-PAGE-01 — Contrato `page.page_type` y aliases.** Cerrada
   2026-08-14 como Fase 0. La comparación contra
