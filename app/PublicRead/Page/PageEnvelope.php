@@ -109,10 +109,10 @@ final readonly class PageEnvelope
             $settings = is_array($data['settings'] ?? null) ? $data['settings'] : [];
 
             return [
+                'settings' => $settings,
                 'mainMenu' => $this->menu($navigation['main'] ?? null, $locale, $collectionSlugs),
                 'footerMenu' => $this->menu($navigation['footer'] ?? null, $locale, $collectionSlugs),
                 'legalMenu' => $this->menu($navigation['legal'] ?? null, $locale, $collectionSlugs),
-                'settings' => $settings,
                 'socialLinks' => $this->socialLinks($settings),
             ];
         } catch (Throwable) {

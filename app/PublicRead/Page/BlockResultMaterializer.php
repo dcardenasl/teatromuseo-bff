@@ -67,6 +67,12 @@ final readonly class BlockResultMaterializer
             $result['status'] = (int) ($main['status'] ?? 0);
             $result['data'] = $this->items($main['data'] ?? null);
             $result['meta'] = is_array($main['meta'] ?? null) ? $main['meta'] : [];
+            if (is_array($main['source'] ?? null)) {
+                // WebApiClient promotes the direct response source into
+                // meta.source. Preserve that shape for byte-level parity
+                // when the BFF calls a reader in-process.
+                $result['meta']['source'] = $main['source'];
+            }
             if ($plan['kind'] === 'list' && ! isset($result['meta']['pagination'])) {
                 $result['meta']['pagination'] = $this->pagination(
                     $result['meta'],
