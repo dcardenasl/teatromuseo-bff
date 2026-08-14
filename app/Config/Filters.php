@@ -45,6 +45,8 @@ class Filters extends BaseFilters
         'performance'        => PerformanceMetrics::class,
         'throttle'           => ThrottleFilter::class,
         'introspectauth'     => IntrospectAuthFilter::class,
+        'webappkey'          => \App\Filters\WebAppKeyRequiredFilter::class,
+        'publicTelemetry'    => \App\Filters\PublicReadTelemetryFilter::class,
         'locale'             => LocaleFilter::class,
         'featureToggle'      => FeatureToggleFilter::class,
         'deprecationheaders' => \dcardenasl\Ci4ApiCore\Http\Filters\DeprecationHeadersFilter::class,

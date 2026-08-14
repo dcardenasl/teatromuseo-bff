@@ -24,6 +24,7 @@ final class StatelessArchitectureTest extends CIUnitTestCase
         'db_connect' => '/\\\\?Database\s*::\s*connect\s*\(/',
         'db_config' => '/^use\s+Config\\\\Database\b/m',
         'db_connection' => '/^use\s+CodeIgniter\\\\Database\\\\/m',
+        'write_query' => '/->\s*(?:insert|update|delete|replace|truncate)\s*\(/i',
     ];
 
     public function testCodebaseIsCompletelyStateless(): void
@@ -47,6 +48,12 @@ final class StatelessArchitectureTest extends CIUnitTestCase
                 continue;
             }
 
+            // Direct cross-database public reads are deliberately isolated in
+            // this seam. Models and model() remain forbidden everywhere,
+            // including here; only named read-only connection plumbing is
+            // allowed under app/PublicRead.
+            $readDatabaseSeam = str_starts_with($relative, 'app/PublicRead/');
+
             $source = file_get_contents($path);
             if (!is_string($source) || $source === '') {
                 continue;
@@ -63,6 +70,12 @@ final class StatelessArchitectureTest extends CIUnitTestCase
             }
 
             foreach (self::FORBIDDEN_PATTERNS as $ruleName => $pattern) {
+                if ($readDatabaseSeam && in_array($ruleName, ['db_connect', 'db_config', 'db_connection'], true)) {
+                    continue;
+                }
+                if (!$readDatabaseSeam && $ruleName === 'write_query') {
+                    continue;
+                }
                 $count = preg_match_all($pattern, $code);
                 if ($count > 0) {
                     $violations[] = "{$relative}: violating '{$ruleName}' (matched {$count} times)";
@@ -74,7 +87,7 @@ final class StatelessArchitectureTest extends CIUnitTestCase
             [],
             $violations,
             "Stateless architecture violations found in teatromuseo-bff:\n- " . implode("\n- ", $violations) . "\n\n" .
-            "The BFF must remain completely database-free and model-free. All proxy/aggregation flows go directly to the upstream hub or domain APIs."
+            "The BFF must remain model-free; direct reads are permitted only through the isolated app/PublicRead read-only seam."
         );
     }
 }

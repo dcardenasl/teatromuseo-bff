@@ -6,6 +6,7 @@ parameters:
         - app/Controllers
         - app/Libraries
         - app/Filters
+        - app/PublicRead
     parallel:
         jobSize: 20
         processTimeout: 600.0
