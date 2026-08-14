@@ -18,9 +18,14 @@ class ControllerConventionsTest extends CIUnitTestCase
      * Controllers/methods allowed to bypass strict BaseProxyController conventions.
      *
      * HealthController is keeping thin (no BaseProxyController overhead) as an infrastructure probe.
+     * PublicRead controllers are local SQL read adapters, not upstream
+     * proxies; they must translate database failures into the versioned
+     * unavailable envelope instead of relying on BaseProxyController's
+     * ApiException path.
      */
     private const ALLOWED_INFRA_CONTROLLERS = [
         'app/Controllers/Api/V1/System/HealthController.php',
+        'app/Controllers/Api/V1/PublicRead/CmsPublicReadController.php',
     ];
 
     public function testApiV1ControllersExtendBaseProxyControllerAndFollowConventions(): void

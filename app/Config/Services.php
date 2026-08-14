@@ -94,4 +94,24 @@ class Services extends BaseService
             new \CodeIgniter\HTTP\UserAgent()
         );
     }
+
+    public static function publicReadCms(bool $getShared = true): \App\PublicRead\CmsPublicReadBundle
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCms');
+        }
+
+        return \App\PublicRead\PublicReadContainer::cms();
+    }
+
+    public static function publicReadCmsLanguages(bool $getShared = true): \App\PublicRead\CmsLanguageReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCmsLanguages');
+        }
+
+        return new \App\PublicRead\CmsLanguageReader(
+            \App\PublicRead\PublicReadContainer::database('cms_readonly'),
+        );
+    }
 }
