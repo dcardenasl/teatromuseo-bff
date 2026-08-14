@@ -105,8 +105,24 @@ final class PublicReadContainer
 
     public static function blockTree(): Page\BlockTreeResolver
     {
+        return self::blockTreeFor(self::cms());
+    }
+
+    public static function pageEnvelope(): Page\PageEnvelope
+    {
+        $cms = self::cms();
+
+        return new Page\PageEnvelope(
+            resolver: new Page\PageResolver($cms->redirects, $cms->pages, $cms->collections, $cms->entries),
+            layout: $cms->layout,
+            blocks: self::blockTreeFor($cms),
+        );
+    }
+
+    private static function blockTreeFor(CmsPublicReadBundle $cms): Page\BlockTreeResolver
+    {
         return new Page\BlockTreeResolver(new Page\PublicReadBlockTreeSource(
-            cms: self::cms(),
+            cms: $cms,
             catalog: self::catalog(),
             catalogFacets: self::catalogFacets(),
             eventsReader: self::events(),

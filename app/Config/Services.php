@@ -168,4 +168,13 @@ class Services extends BaseService
 
         return \App\PublicRead\PublicReadContainer::blockTree();
     }
+
+    public static function publicReadPageEnvelope(bool $getShared = true): \App\PublicRead\Page\PageEnvelope
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadPageEnvelope');
+        }
+
+        return \App\PublicRead\PublicReadContainer::pageEnvelope();
+    }
 }

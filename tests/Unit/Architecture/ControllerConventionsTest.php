@@ -28,6 +28,7 @@ class ControllerConventionsTest extends CIUnitTestCase
         'app/Controllers/Api/V1/PublicRead/CmsPublicReadController.php',
         'app/Controllers/Api/V1/PublicRead/CatalogPublicReadController.php',
         'app/Controllers/Api/V1/PublicRead/EventPublicReadController.php',
+        'app/Controllers/Api/V1/PublicRead/PageResolutionController.php',
     ];
 
     public function testApiV1ControllersExtendBaseProxyControllerAndFollowConventions(): void

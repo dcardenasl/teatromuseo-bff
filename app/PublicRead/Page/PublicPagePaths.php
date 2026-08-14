@@ -115,7 +115,7 @@ final class PublicPagePaths
         return trim(is_string($parsed) ? $parsed : '', '/');
     }
 
-    private static function routePath(string $routeKey, string $locale): string
+    public static function routePath(string $routeKey, string $locale): string
     {
         $locale = strtolower(trim($locale));
 

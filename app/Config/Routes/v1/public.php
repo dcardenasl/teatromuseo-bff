@@ -12,6 +12,7 @@ $routes->group('public-read', ['namespace' => '\\App\\Controllers\\Api\\V1\\Publ
     $routes->get('(:segment)/settings', 'CmsPublicReadController::settings/$1');
     $routes->get('(:segment)/pages', 'CmsPublicReadController::pages/$1');
     $routes->get('(:segment)/pages/(.+)', 'CmsPublicReadController::page/$1/$2');
+    $routes->get('(:segment)/page-resolve/(:any)', 'PageResolutionController::show/$1/$2');
     $routes->get('(:segment)/page-bootstrap/(.+)', 'CmsPublicReadController::pageBootstrap/$1/$2');
     $routes->get('(:segment)/entries/(:segment)', 'CmsPublicReadController::entries/$1/$2');
     $routes->get('(:segment)/entries/(:segment)/(:any)', 'CmsPublicReadController::entry/$1/$2/$3');
