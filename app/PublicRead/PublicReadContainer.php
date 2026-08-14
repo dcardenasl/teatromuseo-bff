@@ -103,6 +103,18 @@ final class PublicReadContainer
         return new EventTypeReader(self::database('event_readonly'));
     }
 
+    public static function blockTree(): Page\BlockTreeResolver
+    {
+        return new Page\BlockTreeResolver(new Page\PublicReadBlockTreeSource(
+            cms: self::cms(),
+            catalog: self::catalog(),
+            catalogFacets: self::catalogFacets(),
+            eventsReader: self::events(),
+            eventTypesReader: self::eventTypes(),
+            requestDtos: \Config\Services::requestDtoFactory(false),
+        ));
+    }
+
     private static function fileMetaResolver(): DirectDbFileMetaResolver
     {
         $bff = config('Bff');

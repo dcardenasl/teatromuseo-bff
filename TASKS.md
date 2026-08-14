@@ -25,6 +25,25 @@
   `cms_page`; el fixture local no contiene una colección sin página CMS para
   ejecutar el caso sintético vía HTTP sin alterar datos.
 
+- [x] **BFF-PAGE-06 — `BlockTreeResolver`.** Cerrada 2026-08-14. Se portó el
+  collector recursivo, la traducción de queries por fuente, las dependencias
+  CMS colección/categoría de Catalog, facets, forms, detalles sembrados y la
+  materialización compatible con Web detrás de `BlockTreeSourceInterface` y
+  `PublicReadBlockTreeSource`; no usa `WebApiClient`, oleadas HTTP ni modifica
+  `PageDelivery`/snapshots. Cada bloque conserva `ok`, `status`, `data`,
+  `meta`, `stale`, `messages` e `instance`, y los fallos quedan aislados.
+  Verificado con 3 tests / 18 assertions focales, `composer quality` completo
+  (164 tests / 459 assertions, 1 skip, 1 deprecation, PHPStan sin errores,
+  CS-Fixer y arquitectura verdes) y smoke read-only real sobre la home CMS:
+  los tres bloques dinámicos de Event/CMS devolvieron `200` con 3 elementos
+  cada uno. El endpoint final sigue reservado para BFF-PAGE-07.
+
+## 🔴 En progreso
+
+- [ ] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
+  En progreso 2026-08-14. Falta cablear routing, layout, block context y la
+  ruta pública única para cerrar la paridad end-to-end.
+
 - [x] **BFF-PAGE-04 — Entrada de colección + `related()`.** Cerrada
   2026-08-14. `PageResolver` ahora identifica el prefijo localizado de una
   colección, resuelve la entrada por slug y adjunta `collection` y
@@ -186,12 +205,6 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-06 — `BlockTreeResolver`.** Puerto completo del pipeline
-  `BlockPlanCollector`/`BlockRequestPlanner`/`BlockDependencyResolver`/
-  `ListQueryBuilder`/`BlockResultMaterializer` de Web — mismo algoritmo,
-  resolviendo dependencias entre bloques con llamadas a función (sin
-  oleadas HTTP, sin cap de paralelismo). Verificar bloque por bloque contra
-  el resultado que produce hoy el pipeline de Web para el mismo request.
 - [ ] **BFF-PAGE-07 — `PageEnvelope` + `PageResolutionController` + ruta.**
   Arma la respuesta con la forma de `PageDeliveryResponse` (ver contrato en
   el plan), con aislamiento de fallos por bloque (`ok`/`status`/`data`/

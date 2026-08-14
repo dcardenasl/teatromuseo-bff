@@ -159,4 +159,13 @@ class Services extends BaseService
 
         return \App\PublicRead\PublicReadContainer::eventTypes();
     }
+
+    public static function publicReadBlockTree(bool $getShared = true): \App\PublicRead\Page\BlockTreeResolver
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadBlockTree');
+        }
+
+        return \App\PublicRead\PublicReadContainer::blockTree();
+    }
 }
