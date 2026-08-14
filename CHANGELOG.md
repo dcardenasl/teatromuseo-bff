@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`GET /api/v1/public-read/**` and `GET /api/v1/public/**`** — the BFF now serves CMS
+  layout/pages/entries/taxonomy, Catalog collection items/facets, and Event
+  listings/detail/types directly from four dedicated SELECT-only MySQL connections
+  (`cms_readonly`, `catalog_readonly`, `event_readonly`, `hub_readonly` for file
+  metadata), removing the extra upstream HTTP hop for `teatromuseo-web`. Gated by a new
+  `webappkey` filter; `/health` and `/ready` now probe all four connections.
+
 ### Changed
 
 - **Runtime dependency** — upgraded `dcardenasl/ci4-api-core` to `v1.1.1`.
