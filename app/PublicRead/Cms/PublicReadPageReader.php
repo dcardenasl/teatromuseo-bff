@@ -70,7 +70,7 @@ final class PublicReadPageReader
     }
 
     /** @param list<string> $fields */
-    public function show(string $locale, string $path, array $fields): ApiResult
+    public function show(string $locale, string $path, array $fields, bool $preview = false): ApiResult
     {
         $normalized = trim($path, '/');
         if ($normalized === '') {
@@ -87,14 +87,16 @@ final class PublicReadPageReader
         $candidateBuilder = $this->db->table('cms_pages p')
             ->select('p.id, p.parent_id, p.collection_id, p.page_type, p.published_at, p.sort_order, p.sitemap_priority, p.sitemap_changefreq, p.is_in_sitemap, p.updated_at, pt.language_id, pt.slug, pt.title, pt.excerpt, pt.meta_title, pt.meta_description, pt.canonical_url, pt.robots')
             ->join('cms_page_translations pt', 'pt.page_id = p.id')
-            ->where('p.status', 'published')
             ->where('p.deleted_at', null)
             ->whereIn('pt.language_id', $languageIds)
             ->groupStart()
                 ->whereIn('pt.slug', $segments)
                 ->orWhere('pt.slug', $normalized)
             ->groupEnd();
-        $this->applyEffectivePublication($candidateBuilder, 'p.');
+        if (! $preview) {
+            $candidateBuilder->where('p.status', 'published');
+            $this->applyEffectivePublication($candidateBuilder, 'p.');
+        }
         $candidateQuery = $candidateBuilder->get();
         $candidateRows = $candidateQuery !== false ? $candidateQuery->getResultArray() : [];
         if ($candidateRows === []) {
@@ -155,6 +157,9 @@ final class PublicReadPageReader
         }
         $pathMap = $this->buildPathMap(array_values($pages), $translations, $languages, $locale, $defaultLocale);
         $page = $pages[$pageId];
+        if (! $preview && in_array((string) $page['page_type'], self::PAGE_TEMPLATE_TYPES, true)) {
+            return $this->notFound($locale);
+        }
         $translation = $this->resolveTranslation($translations[$pageId] ?? [], $locale, $defaultLocale);
         $payload = [
             'id' => $pageId,
@@ -184,7 +189,7 @@ final class PublicReadPageReader
             data: $this->filterFields($payload, $fields),
             sourceRevision: $this->revision([$page]),
             domain: 'cms',
-            meta: ['fields' => $fields, 'query' => ['path' => $normalized]],
+            meta: ['fields' => $fields, 'query' => ['path' => $normalized, 'preview' => $preview]],
         );
     }
 

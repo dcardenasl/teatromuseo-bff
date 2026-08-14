@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controllers\Api\V1\PublicRead;
 
+use App\PublicRead\Cms\PreviewToken;
 use App\PublicRead\Cms\PublicReadEntryRequestDTO;
 use App\PublicRead\Cms\PublicReadPageRequestDTO;
+use App\PublicRead\Cms\PublicReadPageShowRequestDTO;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
 use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
@@ -55,7 +57,7 @@ final class CmsPublicReadController extends PublicReadSupport
     public function page(string $locale, string $path): ResponseInterface
     {
         try {
-            return $this->result(Services::publicReadCms()->pages->show($locale, $path, $this->fields([], [])));
+            return $this->result(Services::publicReadCms()->pages->show($locale, $path, $this->fields([], []), $this->verifiedPagePreview($locale, $path)));
         } catch (Throwable $exception) {
             return $this->failure($locale, $exception);
         }
@@ -73,7 +75,7 @@ final class CmsPublicReadController extends PublicReadSupport
     public function pageBootstrap(string $locale, string $path): ResponseInterface
     {
         try {
-            return $this->result(Services::publicReadCms()->pageBootstrap->show($locale, $path, $this->fields([], [])));
+            return $this->result(Services::publicReadCms()->pageBootstrap->show($locale, $path, $this->fields([], []), $this->verifiedPagePreview($locale, $path)));
         } catch (Throwable $exception) {
             return $this->failure($locale, $exception);
         }
@@ -149,5 +151,21 @@ final class CmsPublicReadController extends PublicReadSupport
         } catch (Throwable $exception) {
             return $this->failure('en', $exception);
         }
+    }
+
+    private function verifiedPagePreview(string $locale, string $path): bool
+    {
+        $request = Services::requestDtoFactory()->make(
+            PublicReadPageShowRequestDTO::class,
+            $this->query([]),
+        );
+
+        return $request->previewRequested
+            && PreviewToken::verify(
+                'page',
+                strtolower($locale) . ':' . trim($path, '/'),
+                $request->previewExpires,
+                $request->previewSig,
+            );
     }
 }

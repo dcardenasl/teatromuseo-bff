@@ -18,14 +18,14 @@ final class PublicReadPageBootstrapReader
     }
 
     /** @param list<string> $fields */
-    public function show(string $locale, string $path, array $fields = []): ApiResult
+    public function show(string $locale, string $path, array $fields = [], bool $preview = false): ApiResult
     {
         $redirect = null;
         try {
             $redirect = $this->redirectResolver->resolve([trim($path, '/')]);
         } catch (NotFoundException) {
         }
-        $pageResult = $this->pageReader->show($locale, $path, $fields);
+        $pageResult = $this->pageReader->show($locale, $path, $fields, $preview);
         $pageFound = (bool) ($pageResult->body['ok'] ?? false);
         $data = ['redirect' => $redirect, 'page' => $pageFound ? $pageResult->body['data'] : null];
         $revision = sprintf(
@@ -39,7 +39,7 @@ final class PublicReadPageBootstrapReader
             data: $data,
             sourceRevision: $revision,
             domain: 'cms',
-            meta: ['fields' => $fields, 'query' => ['path' => $path]],
+            meta: ['fields' => $fields, 'query' => ['path' => $path, 'preview' => $preview]],
         );
     }
 }
