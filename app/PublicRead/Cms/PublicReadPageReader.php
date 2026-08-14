@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Cms;
 
+use App\PublicRead\Page\PageReaderInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
 /** Set-based CMS page reader with batch block serialization. */
-final class PublicReadPageReader
+final class PublicReadPageReader implements PageReaderInterface
 {
     private const FALLBACK_LOCALE = 'es';
 
     /** @var list<string> Singleton page types exposed to the public site. */
     private const PAGE_TEMPLATE_TYPES = ['template_catalog_item', 'template_event_item'];
+
+    /** @var list<string> Page types accepted by the by-type public lookup. */
+    private const PUBLIC_BY_TYPE = ['home', ...self::PAGE_TEMPLATE_TYPES];
 
     /** @param BaseConnection<mixed, mixed> $db */
     public function __construct(
@@ -201,7 +205,7 @@ final class PublicReadPageReader
      */
     public function byType(string $locale, string $type): ApiResult
     {
-        if (! in_array($type, self::PAGE_TEMPLATE_TYPES, true)) {
+        if (! in_array($type, self::PUBLIC_BY_TYPE, true)) {
             return $this->notFound($locale);
         }
 

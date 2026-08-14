@@ -13,6 +13,21 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-PAGE-03 — `PageResolver`: routing sin bloques.** Cerrada
+  2026-08-14. Se añadió `PageResolver` con el orden verificable
+  redirect → homepage/página CMS → aliases conocidos → `not_found`, usando
+  `PublicRedirectResolver` y `PublicReadPageReader` mediante interfaces. La
+  homepage puede resolver por tipo `home`; los tipos CMS originales se
+  conservan en `source_page_type` mientras el discriminante de entrega pasa a
+  `cms_page`. Se portó la matriz de aliases, el redirect legado
+  `public/{locale}` y la regla de no tocar destinos externos. Verificado con
+  13 tests / 30 assertions focales, `composer quality` completo (158 tests /
+  416 assertions, 1 skip, PHPStan sin errores, CS-Fixer y arquitectura
+  verdes), y smoke HTTP real del lector existente
+  `/api/v1/public-read/es/page-bootstrap/inicio` con `200` contra el stack
+  local y datos CMS. El endpoint final `page-resolve` y la paridad byte a byte
+  quedan explícitamente para BFF-PAGE-07.
+
 - [x] **BFF-PAGE-01 — Contrato `page.page_type` y aliases.** Cerrada
   2026-08-14 como Fase 0. La comparación contra
   `teatromuseo-web/app/Controllers/PageController.php`,
@@ -144,11 +159,6 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-03 — `PageResolver`: routing sin bloques.** Nuevo
-  `app/PublicRead/Page/PageResolver.php`. Cubre redirect (reusa
-  `PublicRedirectResolver`/`RedirectReader`) → página CMS por slug (reusa
-  `PageReader`) → alias conocidos, sin bloques todavía. Verificar paso a
-  paso contra `PageController::resolve()` de Web (pasos 1-2 y homepage).
 - [ ] **BFF-PAGE-04 — Entrada de colección + `related()`.** Extiende
   `PageResolver` con el paso 3 (entrada de colección por slug, reusando
   `CollectionsReader`/`PublicReadEntryReader`). Agrega método `related()`

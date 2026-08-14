@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Cms;
 
+use App\PublicRead\Page\RedirectReaderInterface;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\ResultInterface;
 use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
@@ -22,7 +23,7 @@ use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
  * inventing single-purpose Models for tables with no CRUD surface of their
  * own (`cms_slug_redirects` has never had a Model in this codebase).
  */
-class PublicRedirectResolver
+class PublicRedirectResolver implements RedirectReaderInterface
 {
     /**
      * @param BaseConnection<mixed, mixed> $db
