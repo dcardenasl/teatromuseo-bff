@@ -26,6 +26,7 @@ class ControllerConventionsTest extends CIUnitTestCase
     private const ALLOWED_INFRA_CONTROLLERS = [
         'app/Controllers/Api/V1/System/HealthController.php',
         'app/Controllers/Api/V1/PublicRead/CmsPublicReadController.php',
+        'app/Controllers/Api/V1/PublicRead/CatalogPublicReadController.php',
     ];
 
     public function testApiV1ControllersExtendBaseProxyControllerAndFollowConventions(): void

@@ -114,4 +114,22 @@ class Services extends BaseService
             \App\PublicRead\PublicReadContainer::database('cms_readonly'),
         );
     }
+
+    public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCatalog');
+        }
+
+        return \App\PublicRead\PublicReadContainer::catalog();
+    }
+
+    public static function publicReadCatalogFacets(bool $getShared = true): \App\PublicRead\CatalogFacetReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCatalogFacets');
+        }
+
+        return \App\PublicRead\PublicReadContainer::catalogFacets();
+    }
 }

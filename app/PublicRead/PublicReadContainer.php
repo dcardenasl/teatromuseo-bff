@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead;
 
+use App\PublicRead\Catalog\PublicReadCollectionItemReader;
 use App\PublicRead\Cms\BlockInstanceSerializer;
 use App\PublicRead\Cms\FileUrlResolver;
 use App\PublicRead\Cms\PublicReadCategoryReader;
@@ -68,6 +69,16 @@ final class PublicReadContainer
             layout: new PublicReadLayoutReader($navigation, $settings, $collections),
             redirects: $redirects,
         );
+    }
+
+    public static function catalog(): PublicReadCollectionItemReader
+    {
+        return new PublicReadCollectionItemReader(self::database('catalog_readonly'), self::fileMetaResolver(), self::fallbackLocale());
+    }
+
+    public static function catalogFacets(): CatalogFacetReader
+    {
+        return new CatalogFacetReader(self::database('catalog_readonly'));
     }
 
     private static function fileMetaResolver(): DirectDbFileMetaResolver

@@ -15,9 +15,14 @@ $routes->group('public-read', ['namespace' => '\\App\\Controllers\\Api\\V1\\Publ
     $routes->get('(:segment)/page-bootstrap/(.+)', 'CmsPublicReadController::pageBootstrap/$1/$2');
     $routes->get('(:segment)/entries/(:segment)', 'CmsPublicReadController::entries/$1/$2');
     $routes->get('(:segment)/entries/(:segment)/(:any)', 'CmsPublicReadController::entry/$1/$2/$3');
+    $routes->get('(:segment)/collection-items', 'CatalogPublicReadController::index/$1');
+    $routes->get('(:segment)/collection-items/(:any)', 'CatalogPublicReadController::item/$1/$2');
 });
 
 $routes->group('public', ['namespace' => '\\App\\Controllers\\Api\\V1\\PublicRead', 'filter' => $publicReadFilters], static function ($routes): void {
+    $routes->get('catalog/categories', 'CatalogPublicReadController::categories');
+    $routes->get('catalog/techniques', 'CatalogPublicReadController::techniques');
+    $routes->get('catalog/techniques/(:any)', 'CatalogPublicReadController::technique/$1');
     $routes->get('cms/public/languages', 'CmsPublicReadController::languages');
     $routes->get('(:segment)/collections', 'CmsPublicReadController::collections/$1');
     $routes->get('(:segment)/pages/by-type/(:segment)', 'CmsPublicReadController::pageByType/$1/$2');
