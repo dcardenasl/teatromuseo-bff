@@ -52,7 +52,13 @@ final class PublicReadContainer
         $forms = new PublicReadFormReader($db, self::fallbackLocale());
         $serializer = new BlockInstanceSerializer($db, $fileResolver);
         $pages = new PublicReadPageReader($db, $serializer, self::fallbackLocale());
-        $entries = new PublicReadEntryReader($db, $fileResolver, $serializer, self::fallbackLocale());
+        $entries = new PublicReadEntryReader(
+            $db,
+            $fileResolver,
+            $serializer,
+            new \App\PublicRead\Cms\EntryListingContentResolver($serializer),
+            self::fallbackLocale(),
+        );
         $translationResolver = new TranslationResolver($fileResolver, $db);
         $redirects = new PublicRedirectResolver($db, $translationResolver, new SlugRouter($db));
 

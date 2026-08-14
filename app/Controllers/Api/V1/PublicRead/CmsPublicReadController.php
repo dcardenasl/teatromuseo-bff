@@ -87,7 +87,7 @@ final class CmsPublicReadController extends PublicReadSupport
                 $this->query(['locale' => $locale, 'collection' => $collection]),
             );
 
-            return $this->result(Services::publicReadCms()->entries->index($request, $this->fields([], [])));
+            return $this->result(Services::publicReadCms()->entries->index($request, $request->fields));
         } catch (Throwable $exception) {
             return $this->failure($locale, $exception);
         }

@@ -14,11 +14,19 @@ use dcardenasl\Ci4ApiCore\Support\ApiResult;
  */
 final class PublicReadEntryReader
 {
+    private const ENTRY_DIRECT_COLUMNS = ['published_at', 'created_at', 'sort_order'];
+
+    private const ENTRY_TRANSLATION_FIELDS = [
+        'slug', 'title', 'excerpt', 'meta_title', 'meta_description',
+        'canonical_url', 'robots', 'og_type', 'featured_image_url',
+    ];
+
     /** @param BaseConnection<mixed, mixed> $db */
     public function __construct(
         private readonly BaseConnection $db,
         private readonly FileUrlResolver $fileUrlResolver,
         private readonly BlockInstanceSerializer $blockSerializer,
+        private readonly EntryListingContentResolver $listingContentResolver,
         private readonly string $fallbackLocale = 'es',
     ) {
     }
@@ -35,13 +43,13 @@ final class PublicReadEntryReader
         $builder = $this->publicEntriesBuilder((int) $collection['id'], $request, $languageId, $defaultLanguageId);
         $countBuilder = clone $builder;
         $total = (int) $countBuilder->countAllResults();
-        $order = $request->orderBy === 'title' ? 'et_order.title' : 'e.' . $request->orderBy;
-        $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at')
-            ->orderBy($order, $request->orderDirection)->orderBy('e.id', 'ASC')
+        $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at');
+        $this->applyOrdering($builder, $request, $languageId, $defaultLanguageId);
+        $builder->orderBy('e.id', 'ASC')
             ->limit($request->perPage, ($request->page - 1) * $request->perPage);
         $query = $builder->get();
         $rows = $query !== false ? array_values($query->getResultArray()) : [];
-        $data = $this->hydrate($rows, $request->locale, $languageId, $defaultLanguageId, $languageCodes, $fields);
+        $data = $this->hydrate($rows, $request->locale, $languageId, $defaultLanguageId, $languageCodes, $fields, false, $request);
 
         return PublicReadEnvelope::success(
             locale: $request->locale,
@@ -104,8 +112,174 @@ final class PublicReadEntryReader
                 . $languageId . ', ' . $defaultLanguageId . ') AND (es.title LIKE ' . $needle . ' OR es.excerpt LIKE ' . $needle . '))';
             $builder->where($condition, null, false);
         }
+        if ($request->filterBy !== null && $request->filterValue !== null) {
+            $field = $this->classifyField($request->filterBy);
+            $this->applyFieldFilter(
+                $builder,
+                $field,
+                $request->filterBy,
+                $languageId,
+                $defaultLanguageId,
+                $request->filterOperator,
+                $request->filterValue,
+            );
+        }
 
         return $builder;
+    }
+
+    private function applyOrdering(
+        \CodeIgniter\Database\BaseBuilder $builder,
+        PublicReadEntryRequestDTO $request,
+        int $languageId,
+        int $defaultLanguageId,
+    ): void {
+        if ($request->listingField === null) {
+            $order = match ($request->orderBy) {
+                'title' => 'et_order.title',
+                'published_at', 'created_at', 'sort_order' => 'e.' . $request->orderBy,
+                default => 'e.sort_order',
+            };
+            $direction = $request->orderDirection === 'DESC' ? 'DESC' : 'ASC';
+            $builder->orderBy($order, $direction);
+
+            return;
+        }
+
+        $field = $this->classifyField($request->listingField);
+        $column = null;
+        $valueType = 'string';
+        if ($field['mode'] === 'entry_column') {
+            $column = 'e.' . $field['column'];
+        } elseif ($field['mode'] === 'entry_translation') {
+            $this->joinTranslationValueSubquery($builder, $field['column'], $languageId, $defaultLanguageId, 'order_trans');
+            $column = 'order_trans.resolved_value';
+        } elseif ($field['mode'] === 'facet') {
+            $this->joinFacetSubquery($builder, $request->listingField, $languageId, $defaultLanguageId, 'order_facet');
+            $column = 'order_facet.value_string';
+            $valueType = $this->resolveFacetValueType($request->listingField);
+        }
+
+        if ($column !== null) {
+            $this->applyFieldOrder($builder, $column, $valueType, $request->orderDirection);
+        }
+        $builder->orderBy('e.published_at', 'DESC')
+            ->orderBy('e.created_at', 'DESC')
+            ->orderBy('e.id', 'DESC');
+    }
+
+    /** @param array{mode: string, column: string} $field */
+    private function applyFieldFilter(
+        \CodeIgniter\Database\BaseBuilder $builder,
+        array $field,
+        string $rawField,
+        int $languageId,
+        int $defaultLanguageId,
+        string $operator,
+        string $value,
+    ): void {
+        $column = match ($field['mode']) {
+            'entry_column' => 'e.' . $field['column'],
+            'entry_translation' => (function () use ($builder, $field, $languageId, $defaultLanguageId): string {
+                $this->joinTranslationValueSubquery($builder, $field['column'], $languageId, $defaultLanguageId, 'filter_trans');
+
+                return 'filter_trans.resolved_value';
+            })(),
+            'facet' => (function () use ($builder, $rawField, $languageId, $defaultLanguageId): string {
+                $this->joinFacetSubquery($builder, $rawField, $languageId, $defaultLanguageId, 'filter_facet', 'inner');
+
+                return 'filter_facet.value_string';
+            })(),
+            default => null,
+        };
+
+        if ($column === null) {
+            $builder->where('1 = 0', null, false);
+
+            return;
+        }
+
+        if ($operator === 'contains') {
+            $builder->where($column . ' LIKE ' . $this->db->escape('%' . $value . '%'), null, false);
+        } else {
+            $builder->where($column, $value);
+        }
+    }
+
+    /** @return array{mode: string, column: string} */
+    private function classifyField(string $field): array
+    {
+        if (str_starts_with($field, 'entry.')) {
+            $name = substr($field, 6);
+            if (in_array($name, self::ENTRY_DIRECT_COLUMNS, true)) {
+                return ['mode' => 'entry_column', 'column' => $name];
+            }
+            if (in_array($name, self::ENTRY_TRANSLATION_FIELDS, true)) {
+                return ['mode' => 'entry_translation', 'column' => $name];
+            }
+
+            return ['mode' => 'none', 'column' => ''];
+        }
+
+        if (str_starts_with($field, 'taxonomy.')) {
+            return ['mode' => 'none', 'column' => ''];
+        }
+
+        return ['mode' => 'facet', 'column' => ''];
+    }
+
+    private function applyFieldOrder(
+        \CodeIgniter\Database\BaseBuilder $builder,
+        string $column,
+        string $valueType,
+        string $direction,
+    ): void {
+        if ($direction === 'UPCOMING' && $valueType === 'date') {
+            $now = $this->db->escape(date('Y-m-d H:i:s'));
+            $builder->orderBy("CASE WHEN {$column} IS NULL THEN 2 WHEN {$column} >= {$now} THEN 0 ELSE 1 END", 'ASC', false)
+                ->orderBy("CASE WHEN {$column} >= {$now} THEN {$column} END", 'ASC', false)
+                ->orderBy("CASE WHEN {$column} < {$now} THEN {$column} END", 'DESC', false);
+
+            return;
+        }
+
+        $sqlDirection = $direction === 'DESC' ? 'DESC' : 'ASC';
+        $builder->orderBy("({$column} IS NULL)", 'ASC', false)
+            ->orderBy($column, $sqlDirection, false);
+    }
+
+    private function joinTranslationValueSubquery(
+        \CodeIgniter\Database\BaseBuilder $builder,
+        string $column,
+        int $languageId,
+        int $defaultLanguageId,
+        string $alias,
+        string $joinType = 'left',
+    ): void {
+        $quotedColumn = $this->db->escapeIdentifiers($column);
+        $sql = '(SELECT entry_id, COALESCE(MAX(CASE WHEN language_id = ' . $languageId . ' THEN ' . $quotedColumn . ' END), MAX(CASE WHEN language_id = ' . $defaultLanguageId . ' THEN ' . $quotedColumn . ' END)) AS resolved_value FROM cms_entry_translations WHERE ' . $quotedColumn . ' IS NOT NULL AND ' . $quotedColumn . " <> '' AND language_id IN ({$languageId}, {$defaultLanguageId}) GROUP BY entry_id) {$alias}";
+        $builder->join($sql, $alias . '.entry_id = e.id', $joinType);
+    }
+
+    private function joinFacetSubquery(
+        \CodeIgniter\Database\BaseBuilder $builder,
+        string $fieldKey,
+        int $languageId,
+        int $defaultLanguageId,
+        string $alias,
+        string $joinType = 'left',
+    ): void {
+        $escapedField = $this->db->escape($fieldKey);
+        $sql = '(SELECT entry_id, COALESCE(MAX(CASE WHEN language_id = ' . $languageId . " THEN value_string END), MAX(CASE WHEN language_id = {$defaultLanguageId} THEN value_string END)) AS value_string, COALESCE(MAX(CASE WHEN language_id = {$languageId} THEN value_date END), MAX(CASE WHEN language_id = {$defaultLanguageId} THEN value_date END)) AS value_date FROM cms_entry_facet_values WHERE field_key = {$escapedField} AND language_id IN ({$languageId}, {$defaultLanguageId}) GROUP BY entry_id) {$alias}";
+        $builder->join($sql, $alias . '.entry_id = e.id', $joinType);
+    }
+
+    private function resolveFacetValueType(string $fieldKey): string
+    {
+        $query = $this->db->table('cms_entry_facet_values')->select('value_type')->where('field_key', $fieldKey)->limit(1)->get();
+        $row = $query !== false ? $query->getRowArray() : null;
+
+        return is_array($row) ? (string) ($row['value_type'] ?? 'string') : 'string';
     }
 
     /**
@@ -114,7 +288,7 @@ final class PublicReadEntryReader
      * @param list<string> $fields
      * @return list<array<string, mixed>>
      */
-    private function hydrate(array $rows, string $locale, int $languageId, int $defaultLanguageId, array $languageCodes, array $fields, bool $includeBlocks = false): array
+    private function hydrate(array $rows, string $locale, int $languageId, int $defaultLanguageId, array $languageCodes, array $fields, bool $includeBlocks = false, ?PublicReadEntryRequestDTO $request = null): array
     {
         if ($rows === []) {
             return [];
@@ -158,7 +332,27 @@ final class PublicReadEntryReader
             if ($includeBlocks || $fields === [] || in_array('blocks', $fields, true)) {
                 $item['blocks'] = $this->blockSerializer->forContent('entry', $id, $locale);
             }
-            $result[] = $fields === [] ? $item : array_intersect_key($item, array_flip($fields));
+            $result[] = $item;
+        }
+
+        if ($request?->includeListingContent === true) {
+            $listingContent = $this->listingContentResolver->resolveBatch(
+                $result,
+                $locale,
+                $fields,
+                $request->listingContentFields,
+            );
+            foreach ($result as &$item) {
+                $item['listing_content'] = $listingContent[(int) ($item['id'] ?? 0)] ?? [];
+            }
+            unset($item);
+        }
+
+        if ($fields !== []) {
+            $result = array_map(
+                static fn (array $item): array => array_intersect_key($item, array_flip($fields)),
+                $result,
+            );
         }
 
         return $result;
