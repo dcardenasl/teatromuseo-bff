@@ -13,6 +13,21 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-PAGE-04 — Entrada de colección + `related()`.** Cerrada
+  2026-08-14. `PageResolver` ahora identifica el prefijo localizado de una
+  colección, resuelve la entrada por slug y adjunta `collection` y
+  `related_entries`. `PublicReadEntryReader::related()` porta el algoritmo de
+  Web: primera pasada por categoría, relleno genérico acotado, exclusión del
+  elemento actual y deduplicación estable; usa el mismo builder SQL y la
+  proyección existente. La proyección localizada también queda disponible
+  como `localized` para las tarjetas públicas. Verificado con 15 tests / 47
+  assertions focales, `composer quality` completo (160 tests / 433
+  assertions, 1 skip, PHPStan sin errores, CS-Fixer y arquitectura verdes) y
+  smoke directo contra MySQL local: `show()` `200` para
+  `noticias/lanzamiento-del-libro-los-horribles` y `related()` devuelve tres
+  slugs distintos sin incluir el actual. El endpoint final `page-resolve` y
+  la composición de bloques siguen reservados para BFF-PAGE-07.
+
 - [x] **BFF-PAGE-03 — `PageResolver`: routing sin bloques.** Cerrada
   2026-08-14. Se añadió `PageResolver` con el orden verificable
   redirect → homepage/página CMS → aliases conocidos → `not_found`, usando
@@ -159,12 +174,6 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-04 — Entrada de colección + `related()`.** Extiende
-  `PageResolver` con el paso 3 (entrada de colección por slug, reusando
-  `CollectionsReader`/`PublicReadEntryReader`). Agrega método `related()`
-  nuevo a `PublicReadEntryReader` (preferencia por categoría compartida +
-  relleno genérico + dedup, portado de `SiteEntryService::related()` de
-  Web), sobre la misma `publicEntriesBuilder()` que ya usa `index()`.
 - [ ] **BFF-PAGE-05 — Índice de colección de respaldo.** Paso 5 del
   algoritmo de Web (`renderFallbackCollectionIndex()`): sintetiza una página
   `collection_fallback_index` cuando una colección no tiene página CMS

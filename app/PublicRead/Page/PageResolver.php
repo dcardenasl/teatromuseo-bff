@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\PublicRead\Page;
 
 use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
+use Throwable;
 
 /** Resolves public routing before layout and block composition. */
 final class PageResolver
@@ -12,6 +13,8 @@ final class PageResolver
     public function __construct(
         private readonly RedirectReaderInterface $redirects,
         private readonly PageReaderInterface $pages,
+        private readonly ?CollectionReaderInterface $collections = null,
+        private readonly ?EntryReaderInterface $entries = null,
     ) {
     }
 
@@ -52,6 +55,11 @@ final class PageResolver
             if ($page !== null) {
                 return $this->pageResult($page);
             }
+        }
+
+        $entryPage = $this->entryFor($locale, $path);
+        if ($entryPage !== null) {
+            return $this->pageResult($entryPage, 'collection_entry');
         }
 
         return ['outcome' => 'not_found', 'redirect' => null, 'page' => null];
@@ -110,13 +118,100 @@ final class PageResolver
      * @param array<string, mixed> $page
      * @return array{outcome: 'page', redirect: null, page: array<string, mixed>}
      */
-    private function pageResult(array $page): array
+    private function pageResult(array $page, string $pageType = 'cms_page'): array
     {
-        $sourcePageType = (string) ($page['page_type'] ?? '');
-        $page['source_page_type'] = $sourcePageType;
-        $page['page_type'] = 'cms_page';
+        if ($pageType === 'cms_page') {
+            $sourcePageType = (string) ($page['page_type'] ?? '');
+            $page['source_page_type'] = $sourcePageType;
+        }
+        $page['page_type'] = $pageType;
 
         return ['outcome' => 'page', 'redirect' => null, 'page' => $page];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function entryFor(string $locale, string $path): ?array
+    {
+        if (! $this->collections instanceof CollectionReaderInterface || ! $this->entries instanceof EntryReaderInterface) {
+            return null;
+        }
+
+        foreach ($this->collectionCandidates($this->collections->list($locale), $locale, $path) as $candidate) {
+            if ($candidate['remainder'] === '') {
+                continue;
+            }
+
+            $collection = $candidate['collection'];
+            $collectionKey = trim((string) ($collection['collection_key'] ?? ''));
+            if ($collectionKey === '') {
+                continue;
+            }
+            $result = $this->entries->show($locale, $collectionKey, $candidate['remainder'], []);
+            $entry = $result->body['data'] ?? null;
+            if (($result->body['ok'] ?? false) !== true || ! is_array($entry)) {
+                continue;
+            }
+
+            try {
+                $entry['related_entries'] = $this->entries->related($locale, $collectionKey, $entry, 3);
+            } catch (Throwable) {
+                $entry['related_entries'] = [];
+            }
+            $entry['collection'] = $collection;
+
+            return $entry;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $collections
+     * @return list<array{collection: array<string, mixed>, remainder: string}>
+     */
+    private function collectionCandidates(array $collections, string $locale, string $path): array
+    {
+        $normalizedPath = trim($path, '/');
+        if ($normalizedPath === '') {
+            return [];
+        }
+
+        $candidates = [];
+        foreach ($collections as $collection) {
+            $prefix = $this->collectionPath($collection, $locale);
+            if ($prefix === '') {
+                continue;
+            }
+            if ($normalizedPath === $prefix) {
+                $candidates[] = ['collection' => $collection, 'remainder' => ''];
+                continue;
+            }
+            if (str_starts_with($normalizedPath, $prefix . '/')) {
+                $candidates[] = [
+                    'collection' => $collection,
+                    'remainder' => substr($normalizedPath, strlen($prefix) + 1),
+                ];
+            }
+        }
+
+        return $candidates;
+    }
+
+    /** @param array<string, mixed> $collection */
+    private function collectionPath(array $collection, string $locale): string
+    {
+        $indexPage = $collection['index_page'] ?? null;
+        if (is_array($indexPage)) {
+            $localizedSlugs = $indexPage['localized_slugs'] ?? null;
+            if (is_array($localizedSlugs)) {
+                $slug = trim((string) ($localizedSlugs[$locale] ?? ''), '/');
+                if ($slug !== '') {
+                    return $slug;
+                }
+            }
+        }
+
+        return trim((string) ($collection['collection_key'] ?? ''), '/');
     }
 
     /** @return array{outcome: 'redirect', redirect: array{path: string, status: int}, page: null} */

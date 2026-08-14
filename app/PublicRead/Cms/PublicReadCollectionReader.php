@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Cms;
 
+use App\PublicRead\Page\CollectionReaderInterface;
 use CodeIgniter\Database\BaseConnection;
 
 /** Set-based public CMS collection projection. */
-final class PublicReadCollectionReader
+final class PublicReadCollectionReader implements CollectionReaderInterface
 {
     /** @param BaseConnection<mixed, mixed> $db */
     public function __construct(private readonly BaseConnection $db, private readonly string $fallbackLocale = 'es')

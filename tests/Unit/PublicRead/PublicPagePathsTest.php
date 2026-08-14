@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\PublicRead;
 
+use App\PublicRead\Page\CollectionReaderInterface;
+use App\PublicRead\Page\EntryReaderInterface;
 use App\PublicRead\Page\PageReaderInterface;
 use App\PublicRead\Page\PageResolver;
 use App\PublicRead\Page\PublicPagePaths;
@@ -110,6 +112,54 @@ final class PublicPagePathsTest extends CIUnitTestCase
 
         self::assertSame('not_found', $result['outcome']);
         self::assertNull($result['page']);
+    }
+
+    public function testResolvesCollectionEntryAndAttachesRelatedEntries(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $collections = $this->createMock(CollectionReaderInterface::class);
+        $collections->expects(self::once())->method('list')->with('es')->willReturn([
+            [
+                'id' => 7,
+                'collection_key' => 'news',
+                'index_page' => ['localized_slugs' => ['es' => 'noticias']],
+            ],
+        ]);
+        $entries = $this->createMock(EntryReaderInterface::class);
+        $entries->expects(self::once())->method('show')->with('es', 'news', 'current', [])->willReturn(
+            new ApiResult(['ok' => true, 'data' => ['slug' => 'current', 'title' => 'Current']], 200),
+        );
+        $entries->expects(self::once())->method('related')->with('es', 'news', ['slug' => 'current', 'title' => 'Current'], 3)->willReturn([
+            ['slug' => 'related'],
+        ]);
+
+        $result = (new PageResolver($redirects, $pages, $collections, $entries))->resolve('es', 'noticias/current');
+
+        self::assertSame('page', $result['outcome']);
+        self::assertSame('collection_entry', $result['page']['page_type']);
+        self::assertSame('news', $result['page']['collection']['collection_key']);
+        self::assertSame([['slug' => 'related']], $result['page']['related_entries']);
+    }
+
+    public function testRelatedFailureDoesNotDiscardTheCollectionEntry(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $collections = $this->createMock(CollectionReaderInterface::class);
+        $collections->method('list')->willReturn([['collection_key' => 'news']]);
+        $entries = $this->createMock(EntryReaderInterface::class);
+        $entries->method('show')->willReturn(new ApiResult(['ok' => true, 'data' => ['slug' => 'current']], 200));
+        $entries->method('related')->willThrowException(new \RuntimeException('related source unavailable'));
+
+        $result = (new PageResolver($redirects, $pages, $collections, $entries))->resolve('es', 'news/current');
+
+        self::assertSame('collection_entry', $result['page']['page_type']);
+        self::assertSame([], $result['page']['related_entries']);
     }
 
     /** @return iterable<string, array{string, string, ?string}> */

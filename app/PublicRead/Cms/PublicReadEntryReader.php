@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Cms;
 
+use App\PublicRead\Page\EntryReaderInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
@@ -12,7 +13,7 @@ use dcardenasl\Ci4ApiCore\Support\ApiResult;
  * SQL-first CMS entry projection. It intentionally has no model/service
  * dependencies so the same read model can run inside the BFF.
  */
-final class PublicReadEntryReader
+final class PublicReadEntryReader implements EntryReaderInterface
 {
     private const ENTRY_DIRECT_COLUMNS = ['published_at', 'created_at', 'sort_order'];
 
@@ -40,7 +41,7 @@ final class PublicReadEntryReader
         if (! is_array($collection)) {
             return $this->notFound($request->locale, 'Collection not found.');
         }
-        $builder = $this->publicEntriesBuilder((int) $collection['id'], $request, $languageId, $defaultLanguageId);
+        $builder = $this->publicEntriesBuilder((int) $collection['id'], $request->toArray(), $languageId, $defaultLanguageId);
         $countBuilder = clone $builder;
         $total = (int) $countBuilder->countAllResults();
         $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at');
@@ -89,43 +90,143 @@ final class PublicReadEntryReader
         return PublicReadEnvelope::success(locale: $locale, data: $data[0] ?? [], sourceRevision: $this->revision($rows), domain: 'cms', meta: ['fields' => $fields, 'collection' => $collectionKey, 'query' => ['slug' => $slug]]);
     }
 
+    /**
+     * Return related entries with the same bounded two-pass algorithm as Web:
+     * category candidates first, then a generic collection fill with stable
+     * de-duplication and self-exclusion.
+     *
+     * @param array<string, mixed> $entry
+     * @return list<array<string, mixed>>
+     */
+    public function related(string $locale, string $collectionKey, array $entry, int $limit = 3): array
+    {
+        $limit = max(0, $limit);
+        if ($limit === 0) {
+            return [];
+        }
+
+        $currentSlug = (string) ($entry['slug'] ?? '');
+        $categories = is_array($entry['categories'] ?? null) ? $entry['categories'] : [];
+        $categorySlug = is_array($categories[0] ?? null) ? (string) ($categories[0]['slug'] ?? '') : '';
+        $fields = ['id', 'slug', 'title', 'excerpt', 'published_at', 'featured_image', 'categories', 'localized'];
+
+        $related = [];
+        if ($categorySlug !== '') {
+            $related = $this->relatedList($locale, $collectionKey, $fields, $limit + 1, $categorySlug);
+            $related = array_values(array_filter(
+                $related,
+                static fn (array $candidate): bool => (string) ($candidate['slug'] ?? '') !== $currentSlug,
+            ));
+            usort($related, static function (array $left, array $right) use ($categorySlug): int {
+                $leftMatch = self::hasCategory($left, $categorySlug) ? 0 : 1;
+                $rightMatch = self::hasCategory($right, $categorySlug) ? 0 : 1;
+
+                return $leftMatch <=> $rightMatch;
+            });
+        }
+
+        if (count($related) < $limit) {
+            $candidates = $this->relatedList($locale, $collectionKey, $fields, $limit + 1);
+            $knownSlugs = array_fill_keys(array_map(
+                static fn (array $candidate): string => (string) ($candidate['slug'] ?? ''),
+                $related,
+            ), true);
+            foreach ($candidates as $candidate) {
+                $slug = (string) ($candidate['slug'] ?? '');
+                if ($slug === $currentSlug || ($slug !== '' && isset($knownSlugs[$slug]))) {
+                    continue;
+                }
+
+                $related[] = $candidate;
+                if ($slug !== '') {
+                    $knownSlugs[$slug] = true;
+                }
+                if (count($related) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return array_slice($related, 0, $limit);
+    }
+
     /** @return \CodeIgniter\Database\BaseBuilder */
-    private function publicEntriesBuilder(int $collectionId, PublicReadEntryRequestDTO $request, int $languageId, int $defaultLanguageId): \CodeIgniter\Database\BaseBuilder
+    /** @param array<string, mixed> $request */
+    private function publicEntriesBuilder(int $collectionId, array $request, int $languageId, int $defaultLanguageId): \CodeIgniter\Database\BaseBuilder
     {
         $builder = $this->db->table('cms_entries e')
             ->join('(SELECT entry_id, COALESCE(MAX(CASE WHEN language_id = ' . $languageId . ' THEN title END), MAX(CASE WHEN language_id = ' . $defaultLanguageId . ' THEN title END)) AS title FROM cms_entry_translations WHERE language_id IN (' . $languageId . ', ' . $defaultLanguageId . ') GROUP BY entry_id) et_order', 'et_order.entry_id = e.id', 'left')
             ->where('e.collection_id', $collectionId)->where('e.workflow_status', 'published')->where('e.deleted_at', null)
             ->groupStart()->where('e.published_at', null)->orWhere('e.published_at <=', date('Y-m-d H:i:s'))->groupEnd()
             ->groupStart()->where('e.scheduled_at', null)->orWhere('e.scheduled_at <=', date('Y-m-d H:i:s'))->groupEnd();
-        if ($request->categoryId !== null) {
-            $builder->where('EXISTS (SELECT 1 FROM cms_entry_categories ec WHERE ec.entry_id = e.id AND ec.category_id = ' . (int) $request->categoryId . ')', null, false);
+        $categoryId = $request['category_id'] ?? null;
+        if ($categoryId !== null && $categoryId !== '') {
+            $builder->where('EXISTS (SELECT 1 FROM cms_entry_categories ec WHERE ec.entry_id = e.id AND ec.category_id = ' . (int) $categoryId . ')', null, false);
         }
-        if ($request->category !== null) {
-            $builder->where('EXISTS (SELECT 1 FROM cms_entry_categories ec JOIN cms_category_translations ct ON ct.category_id = ec.category_id WHERE ec.entry_id = e.id AND ct.slug = ' . $this->db->escape($request->category) . ' AND ct.language_id IN (' . $languageId . ', ' . $defaultLanguageId . '))', null, false);
+        $category = $request['category'] ?? null;
+        if ($category !== null && $category !== '') {
+            $builder->where('EXISTS (SELECT 1 FROM cms_entry_categories ec JOIN cms_category_translations ct ON ct.category_id = ec.category_id WHERE ec.entry_id = e.id AND ct.slug = ' . $this->db->escape((string) $category) . ' AND ct.language_id IN (' . $languageId . ', ' . $defaultLanguageId . '))', null, false);
         }
-        if ($request->tag !== null) {
-            $builder->where('EXISTS (SELECT 1 FROM cms_entry_tags et JOIN cms_tag_translations tt ON tt.tag_id = et.tag_id WHERE et.entry_id = e.id AND tt.slug = ' . $this->db->escape($request->tag) . ' AND tt.language_id IN (' . $languageId . ', ' . $defaultLanguageId . '))', null, false);
+        $tag = $request['tag'] ?? null;
+        if ($tag !== null && $tag !== '') {
+            $builder->where('EXISTS (SELECT 1 FROM cms_entry_tags et JOIN cms_tag_translations tt ON tt.tag_id = et.tag_id WHERE et.entry_id = e.id AND tt.slug = ' . $this->db->escape((string) $tag) . ' AND tt.language_id IN (' . $languageId . ', ' . $defaultLanguageId . '))', null, false);
         }
-        if ($request->search !== null) {
-            $needle = $this->db->escape('%' . $request->search . '%');
+        $search = $request['q'] ?? null;
+        if ($search !== null && $search !== '') {
+            $needle = $this->db->escape('%' . (string) $search . '%');
             $condition = 'EXISTS (SELECT 1 FROM cms_entry_translations es WHERE es.entry_id = e.id AND es.language_id IN ('
                 . $languageId . ', ' . $defaultLanguageId . ') AND (es.title LIKE ' . $needle . ' OR es.excerpt LIKE ' . $needle . '))';
             $builder->where($condition, null, false);
         }
-        if ($request->filterBy !== null && $request->filterValue !== null) {
-            $field = $this->classifyField($request->filterBy);
+        $filterBy = $request['filter_by'] ?? null;
+        $filterValue = $request['filter_value'] ?? null;
+        if ($filterBy !== null && $filterValue !== null) {
+            $field = $this->classifyField((string) $filterBy);
             $this->applyFieldFilter(
                 $builder,
                 $field,
-                $request->filterBy,
+                (string) $filterBy,
                 $languageId,
                 $defaultLanguageId,
-                $request->filterOperator,
-                $request->filterValue,
+                (string) ($request['filter_operator'] ?? 'equals'),
+                (string) $filterValue,
             );
         }
 
         return $builder;
+    }
+
+    /**
+     * @param list<string> $fields
+     * @return list<array<string, mixed>>
+     */
+    private function relatedList(string $locale, string $collectionKey, array $fields, int $limit, ?string $category = null): array
+    {
+        [$languageId, $defaultLanguageId, $languageCodes] = $this->languageIds($locale);
+        $collectionQuery = $this->db->table('cms_collections')->select('id')->where('collection_key', $collectionKey)->where('is_active', 1)->get();
+        $collection = $collectionQuery !== false ? $collectionQuery->getRowArray() : null;
+        if (! is_array($collection)) {
+            return [];
+        }
+
+        $builder = $this->publicEntriesBuilder((int) $collection['id'], [
+            'category' => $category,
+            'category_id' => null,
+            'tag' => null,
+            'q' => null,
+            'filter_by' => null,
+            'filter_value' => null,
+            'filter_operator' => 'equals',
+        ], $languageId, $defaultLanguageId);
+        $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at')
+            ->orderBy('e.published_at', 'DESC')
+            ->orderBy('e.created_at', 'DESC')
+            ->orderBy('e.id', 'DESC')
+            ->limit($limit);
+        $query = $builder->get();
+        $rows = $query !== false ? array_values($query->getResultArray()) : [];
+
+        return $this->hydrate($rows, $locale, $languageId, $defaultLanguageId, $languageCodes, $fields);
     }
 
     private function applyOrdering(
@@ -328,7 +429,13 @@ final class PublicReadEntryReader
                     $localizedSlugs[$languageCodes[$translationId]] = $translation['slug'];
                 }
             }
-            $item = array_merge($row, $selected, ['categories' => $categories[$id] ?? [], 'tags' => $tags[$id] ?? [], 'localized_slugs' => $localizedSlugs, 'is_fallback' => $selectedId !== $languageId]);
+            $item = array_merge($row, $selected, [
+                'categories' => $categories[$id] ?? [],
+                'tags' => $tags[$id] ?? [],
+                'localized' => $selected,
+                'localized_slugs' => $localizedSlugs,
+                'is_fallback' => $selectedId !== $languageId,
+            ]);
             if ($includeBlocks || $fields === [] || in_array('blocks', $fields, true)) {
                 $item['blocks'] = $this->blockSerializer->forContent('entry', $id, $locale);
             }
@@ -356,6 +463,19 @@ final class PublicReadEntryReader
         }
 
         return $result;
+    }
+
+    /** @param array<string, mixed> $entry */
+    private static function hasCategory(array $entry, string $slug): bool
+    {
+        $categories = is_array($entry['categories'] ?? null) ? $entry['categories'] : [];
+        foreach ($categories as $category) {
+            if (is_array($category) && (string) ($category['slug'] ?? '') === $slug) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
