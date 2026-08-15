@@ -9,8 +9,8 @@
 
 Confirmar que `beta.teatromuseo.cl` resuelve páginas públicas mediante el BFF,
 que el BFF puede leer las bases de datos públicas y que la autorización
-Web→BFF está alineada antes de avanzar a la Fase 3 del plan de resolución de
-páginas.
+Web→BFF sigue alineada después del cutover de la Fase 3 del plan de resolución
+de páginas.
 
 ## Entorno
 
@@ -137,12 +137,26 @@ páginas.
 - Las páginas beta siguen devolviendo `200` y el Web mantiene una sola llamada
   BFF por página pública.
 
+### 2026-08-15 — verificación posterior al último deploy
+
+- El deploy incremental de BFF y Web terminó correctamente por FTP; se
+  actualizaron las rutas/controladores del BFF y el adaptador, cliente,
+  renderizadores y controladores públicos del Web.
+- Beta `/health`, `/es`, `/es/contacto` y `/es/cartelera` devolvieron `200`.
+- Las rutas retiradas continuaron devolviendo `404` después del deploy.
+- La prueba directa de `page-resolve` con las claves locales disponibles
+  devolvió `401`, igual que la invalidación de caché. No se modificaron claves
+  remotas ni se registraron valores sensibles: las claves del `.env` local no
+  son la fuente autoritativa del hosting. Por tanto, el smoke del Web confirma
+  el comportamiento público desplegado, pero la verificación directa de
+  autorización Web→BFF debe repetirse con la clave efectiva del hosting.
+
 ## Gates de calidad
 
 - BFF `composer quality`: `170` tests, `504` assertions, salida `0`; PHPStan,
   CS-Fixer y arquitectura sin errores. PHPUnit reportó una deprecación y un
   test omitido ya conocidos por la suite.
-- Web `composer quality`: `480` tests, `1.798` assertions, salida `0`; PHPStan,
+- Web `composer quality`: `372` tests, `1.378` assertions, salida `0`; PHPStan,
   CS-Fixer, i18n y fixture policy sin errores. La suite reportó cinco tests
   omitidos ya conocidos.
 - Ambos gates se ejecutaron con PHP `8.5.5`; CS-Fixer mostró la advertencia
