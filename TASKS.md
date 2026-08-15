@@ -231,7 +231,11 @@ lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
   que `WEB-BFF-04`). Borra el controlador/rutas que exponían `layout` y
   `page-bootstrap` por HTTP público; `PublicReadLayoutReader`/
   `PublicReadPageBootstrapReader` se conservan como colaboradores internos
-  de `PageResolver`, no se borran como clase.
+  de `PageResolver`, no se borran como clase. Preflight local 2026-08-14:
+  canary BFF de 5 iteraciones por `home`, `contacto` y `teatroescuela`, todas
+  `200` con payload estable. El retiro queda pendiente del mismo gate de
+  estabilidad/cutover de Web; no se eliminan rutas públicas mientras existan
+  consumidores legacy no migrados.
 
 ### BFF de lectura directa a 4 BDs (2026-08-13) — ver `../docs/plan/2026-08-13-plan-bff-completo.md`
 
