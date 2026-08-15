@@ -3,13 +3,6 @@
     "description": "CodeIgniter 4 Backend-for-Frontend Starter \u2014 stateless gateway over a ci4-api-starter hub and one or more ci4-domain-starter apps.",
     "type": "project",
     "license": "MIT",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../../ci4-platform/ci4-api-core",
-            "canonical": false
-        }
-    ],
     "require": {
         "php": "^8.2",
         "codeigniter4/framework": "^4.7",
