@@ -69,6 +69,9 @@ $routes->get('/api/versions', static function () {
 });
 
 // System/Health routes at root level (ping, health, ready, live).
+// The same route file is also loaded under /api/v1 below so clients using the
+// versioned API client can use the health contract without a special transport
+// path. Keeping one route definition prevents the two surfaces from drifting.
 if (file_exists(APPPATH . 'Config/Routes/v1/system.php')) {
     require APPPATH . 'Config/Routes/v1/system.php';
 }
@@ -81,9 +84,6 @@ $routes->group('api/v1', function ($routes): void {
     if (is_dir($routesDir)) {
         $files = glob($routesDir . '/*.php');
         foreach ($files as $file) {
-            if (basename($file) === 'system.php') {
-                continue;
-            }
             require $file;
         }
     }

@@ -102,6 +102,19 @@ class HealthControllerTest extends ApiTestCase
         $this->assertArrayNotHasKey('database', $json['checks']);
     }
 
+    public function testVersionedHealthAliasUsesTheSameContract(): void
+    {
+        $this->mockHubPing(200);
+
+        $result = $this->get('/api/v1/health');
+
+        $result->assertStatus(200);
+        $json = json_decode((string) $result->response()->getBody(), true);
+        $this->assertContains($json['status'], ['healthy', 'degraded']);
+        $this->assertArrayHasKey('hub', $json['checks']);
+        $this->assertArrayHasKey('databases', $json['checks']);
+    }
+
     public function testHealthEndpointReturns503WhenMonitoringDisabled(): void
     {
         putenv('MONITORING_ENABLED=false');
