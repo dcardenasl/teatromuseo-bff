@@ -54,7 +54,8 @@ final readonly class PageEnvelope
 
         $page = $resolution['page'];
         $base['layout'] = $this->layout($locale);
-        $base['block_context'] = $this->blockContext($page, $locale, $query, $preview);
+        $resolutionContext = is_array($resolution['context'] ?? null) ? $resolution['context'] : [];
+        $base['block_context'] = $this->blockContext($page, $locale, $query, $preview, $resolutionContext);
         $stale = $this->hasStaleBlock($base['block_context']);
         $base['source'] = [
             'domain' => 'bff',
@@ -128,16 +129,33 @@ final readonly class PageEnvelope
 
     /** @param array<string, mixed> $page
      *  @param array<string, mixed> $query
+     *  @param array<string, mixed> $context
      *  @return array<string, mixed>
      */
-    private function blockContext(array $page, string $locale, array $query, bool $preview): array
-    {
+    private function blockContext(
+        array $page,
+        string $locale,
+        array $query,
+        bool $preview,
+        array $context = [],
+    ): array {
         $blocks = is_array($page['blocks'] ?? null)
             ? array_values(array_filter($page['blocks'], static fn (mixed $block): bool => is_array($block)))
             : [];
 
         try {
-            return $this->blocks->resolve($blocks, $locale, $query, [], $preview);
+            $seededItems = [];
+            if (is_array($context['event_item'] ?? null)) {
+                $seededItems['event_items'] = [$context['event_item']];
+            }
+            if (is_array($context['catalog_item'] ?? null)) {
+                $seededItems['catalog_items'] = [$context['catalog_item']];
+            }
+
+            return array_merge(
+                $context,
+                $this->blocks->resolve($blocks, $locale, $query, $seededItems, $preview),
+            );
         } catch (Throwable) {
             return [
                 'block_prefetch' => [],

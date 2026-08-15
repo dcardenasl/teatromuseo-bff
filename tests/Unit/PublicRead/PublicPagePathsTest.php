@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\PublicRead;
 
+use App\PublicRead\Page\CatalogItemReaderInterface;
 use App\PublicRead\Page\CollectionReaderInterface;
 use App\PublicRead\Page\EntryReaderInterface;
+use App\PublicRead\Page\EventReaderInterface;
 use App\PublicRead\Page\PageReaderInterface;
 use App\PublicRead\Page\PageResolver;
 use App\PublicRead\Page\PublicPagePaths;
@@ -109,6 +111,118 @@ final class PublicPagePathsTest extends CIUnitTestCase
         $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
 
         $result = (new PageResolver($redirects, $pages))->resolve('es', 'does-not-exist');
+
+        self::assertSame('not_found', $result['outcome']);
+        self::assertNull($result['page']);
+    }
+
+    public function testResolvesAnEventDetailThroughTheSingletonTemplateAndSeedsItsContext(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $pages->expects(self::once())->method('byType')->with('es', 'template_event_item')->willReturn(
+            new ApiResult([
+                'ok' => true,
+                'data' => [
+                    'page_type' => 'template_event_item',
+                    'blocks' => [['block_key' => 'event_item_header']],
+                ],
+            ], 200),
+        );
+        $events = $this->createMock(EventReaderInterface::class);
+        $events->expects(self::once())->method('show')->with('es', 'festival-uno', [])->willReturn(
+            new ApiResult([
+                'ok' => true,
+                'data' => [
+                    'id' => 201,
+                    'title' => 'Festival Uno',
+                    'description' => 'Descripción del festival uno.',
+                    'slug' => 'festival-uno',
+                    'slugs' => ['es' => 'festival-uno'],
+                    'localized' => [
+                        'title' => 'Festival Uno',
+                        'description' => 'Descripción del festival uno.',
+                    ],
+                ],
+            ], 200),
+        );
+
+        $result = (new PageResolver(
+            redirects: $redirects,
+            pages: $pages,
+            events: $events,
+        ))->resolve('es', 'cartelera/festival-uno');
+
+        self::assertSame('page', $result['outcome']);
+        self::assertSame('cms_page', $result['page']['page_type']);
+        self::assertSame('template_event_item', $result['page']['source_page_type']);
+        self::assertSame('Festival Uno', $result['page']['title']);
+        self::assertSame('/es/cartelera/festival-uno', $result['page']['canonical_url']);
+        self::assertSame('Festival Uno', $result['context']['event_item']['localized']['title']);
+    }
+
+    public function testResolvesACatalogDetailThroughTheSingletonTemplateAndSeedsItsContext(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $pages->expects(self::once())->method('byType')->with('es', 'template_catalog_item')->willReturn(
+            new ApiResult([
+                'ok' => true,
+                'data' => [
+                    'page_type' => 'template_catalog_item',
+                    'blocks' => [['block_key' => 'catalog_item_header']],
+                ],
+            ], 200),
+        );
+        $catalogItems = $this->createMock(CatalogItemReaderInterface::class);
+        $catalogItems->expects(self::once())->method('show')->with('es', 'TMP-001', [])->willReturn(
+            new ApiResult([
+                'ok' => true,
+                'data' => [
+                    'id' => 101,
+                    'name' => 'Pieza de prueba',
+                    'summary' => 'Resumen de prueba.',
+                    'slug' => 'pieza-de-prueba',
+                    'slugs' => ['es' => 'pieza-de-prueba'],
+                    'localized' => [
+                        'name' => 'Pieza localizada',
+                        'summary' => 'Resumen localizado.',
+                    ],
+                ],
+            ], 200),
+        );
+
+        $result = (new PageResolver(
+            redirects: $redirects,
+            pages: $pages,
+            catalogItems: $catalogItems,
+        ))->resolve('es', 'museo/coleccion/TMP-001');
+
+        self::assertSame('page', $result['outcome']);
+        self::assertSame('template_catalog_item', $result['page']['source_page_type']);
+        self::assertSame('Pieza localizada', $result['page']['title']);
+        self::assertSame('/es/museo/coleccion/pieza-de-prueba', $result['page']['canonical_url']);
+        self::assertSame('Pieza localizada', $result['context']['catalog_item']['localized']['name']);
+    }
+
+    public function testDoesNotFallThroughWhenAConfiguredDomainDetailRouteIsMalformed(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = $this->createMock(PageReaderInterface::class);
+        $pages->method('show')->willReturn(new ApiResult(['ok' => false, 'data' => null], 404));
+        $events = $this->createMock(EventReaderInterface::class);
+        $events->expects(self::never())->method('show');
+
+        $result = (new PageResolver(
+            redirects: $redirects,
+            pages: $pages,
+            events: $events,
+        ))->resolve('es', 'cartelera/festival-uno/extra');
 
         self::assertSame('not_found', $result['outcome']);
         self::assertNull($result['page']);

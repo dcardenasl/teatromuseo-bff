@@ -113,7 +113,14 @@ final class PublicReadContainer
         $cms = self::cms();
 
         return new Page\PageEnvelope(
-            resolver: new Page\PageResolver($cms->redirects, $cms->pages, $cms->collections, $cms->entries),
+            resolver: new Page\PageResolver(
+                redirects: $cms->redirects,
+                pages: $cms->pages,
+                collections: $cms->collections,
+                entries: $cms->entries,
+                events: self::events(),
+                catalogItems: self::catalog(),
+            ),
             layout: $cms->layout,
             blocks: self::blockTreeFor($cms),
         );

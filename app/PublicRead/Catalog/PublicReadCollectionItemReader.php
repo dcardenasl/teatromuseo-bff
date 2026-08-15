@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Catalog;
 
+use App\PublicRead\Page\CatalogItemReaderInterface;
 use App\PublicRead\Support\FileMetaResolverInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
 use CodeIgniter\Database\BaseBuilder;
@@ -16,7 +17,7 @@ use dcardenasl\Ci4ApiCore\Support\ApiResult;
  * The reader owns the public projection and never delegates to
  * CollectionItemService, whose interface is intentionally CRUD-oriented.
  */
-final class PublicReadCollectionItemReader
+final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
 {
     private const RESOURCE_TYPE = 'collection_item';
 

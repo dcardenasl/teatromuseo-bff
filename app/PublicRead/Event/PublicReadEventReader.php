@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Event;
 
+use App\PublicRead\Page\EventReaderInterface;
 use App\PublicRead\Support\FileMetaResolverInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
 use CodeIgniter\Database\BaseBuilder;
@@ -14,7 +15,7 @@ use dcardenasl\Ci4ApiCore\Support\ApiResult;
  * SQL-first public event reader. Hydration is limited to the selected page;
  * the legacy EventService listing remains available for the admin surface.
  */
-final class PublicReadEventReader
+final class PublicReadEventReader implements EventReaderInterface
 {
     /** @var list<string> */
     private const PUBLIC_COLUMNS = [

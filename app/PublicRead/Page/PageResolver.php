@@ -15,6 +15,8 @@ final class PageResolver
         private readonly PageReaderInterface $pages,
         private readonly ?CollectionReaderInterface $collections = null,
         private readonly ?EntryReaderInterface $entries = null,
+        private readonly ?EventReaderInterface $events = null,
+        private readonly ?CatalogItemReaderInterface $catalogItems = null,
     ) {
     }
 
@@ -23,6 +25,7 @@ final class PageResolver
      *     outcome: 'redirect'|'page'|'not_found',
      *     redirect: array{path: string, status: int}|null,
      *     page: array<string, mixed>|null,
+     *     context: array<string, mixed>,
      * }
      */
     public function resolve(
@@ -57,6 +60,19 @@ final class PageResolver
             }
         }
 
+        $domainDetail = $this->domainDetailFor($locale, $path);
+        if ($domainDetail !== null) {
+            if (isset($domainDetail['not_found'])) {
+                return ['outcome' => 'not_found', 'redirect' => null, 'page' => null, 'context' => []];
+            }
+
+            return $this->pageResult(
+                $domainDetail['page'],
+                'cms_page',
+                $domainDetail['context'],
+            );
+        }
+
         $collectionCandidates = $this->collectionCandidatesFor($locale, $path);
         $entryPage = $this->entryFor($locale, $collectionCandidates, $preview);
         if ($entryPage !== null) {
@@ -68,7 +84,7 @@ final class PageResolver
             return $this->pageResult($fallbackPage, 'collection_fallback_index');
         }
 
-        return ['outcome' => 'not_found', 'redirect' => null, 'page' => null];
+        return ['outcome' => 'not_found', 'redirect' => null, 'page' => null, 'context' => []];
     }
 
     /** @return array{path: string, status: int}|null */
@@ -122,9 +138,10 @@ final class PageResolver
 
     /**
      * @param array<string, mixed> $page
-     * @return array{outcome: 'page', redirect: null, page: array<string, mixed>}
+     * @param array<string, mixed> $context
+     * @return array{outcome: 'page', redirect: null, page: array<string, mixed>, context: array<string, mixed>}
      */
-    private function pageResult(array $page, string $pageType = 'cms_page'): array
+    private function pageResult(array $page, string $pageType = 'cms_page', array $context = []): array
     {
         if ($pageType === 'cms_page') {
             $sourcePageType = (string) ($page['page_type'] ?? '');
@@ -132,7 +149,104 @@ final class PageResolver
         }
         $page['page_type'] = $pageType;
 
-        return ['outcome' => 'page', 'redirect' => null, 'page' => $page];
+        return ['outcome' => 'page', 'redirect' => null, 'page' => $page, 'context' => $context];
+    }
+
+    /**
+     * Resolve event/catalog detail routes with the same singleton template
+     * shell used by the Web, returning the detail as pre-seeded block context.
+     *
+     * @return array{page: array<string, mixed>, context: array<string, mixed>}|array{not_found: true}|null
+     */
+    private function domainDetailFor(string $locale, string $path): ?array
+    {
+        foreach ([
+            ['events', $this->events, 'template_event_item', 'event_item'],
+            ['catalog', $this->catalogItems, 'template_catalog_item', 'catalog_item'],
+        ] as [$routeKey, $reader, $templateType, $contextKey]) {
+            if (! $reader instanceof DomainDetailReaderInterface) {
+                continue;
+            }
+
+            $prefix = PublicPagePaths::routePath((string) $routeKey, $locale);
+            if ($prefix === '' || ! str_starts_with($path, $prefix . '/')) {
+                continue;
+            }
+
+            $identifier = trim(substr($path, strlen($prefix) + 1), '/');
+            if ($identifier === '' || str_contains($identifier, '/')) {
+                return ['not_found' => true];
+            }
+
+            $result = $reader->show($locale, $identifier, []);
+            $detail = $result->body['data'] ?? null;
+            if (($result->body['ok'] ?? false) !== true || ! is_array($detail)) {
+                return ['not_found' => true];
+            }
+
+            $templateResult = $this->pages->byType($locale, (string) $templateType);
+            $template = $templateResult->body['data'] ?? null;
+            if (($templateResult->body['ok'] ?? false) !== true || ! is_array($template)) {
+                return ['not_found' => true];
+            }
+
+            return [
+                'page' => $this->domainDetailPage(
+                    $template,
+                    $detail,
+                    $locale,
+                    (string) $routeKey,
+                ),
+                'context' => [(string) $contextKey => $detail],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $template
+     * @param array<string, mixed> $detail
+     * @return array<string, mixed>
+     */
+    private function domainDetailPage(
+        array $template,
+        array $detail,
+        string $locale,
+        string $routeKey,
+    ): array {
+        $localized = is_array($detail['localized'] ?? null) ? $detail['localized'] : [];
+        $isEvent = $routeKey === 'events';
+        $title = (string) ($localized[$isEvent ? 'title' : 'name'] ?? $detail[$isEvent ? 'title' : 'name'] ?? '');
+        $excerpt = (string) ($localized[$isEvent ? 'description' : 'summary'] ?? $detail[$isEvent ? 'description' : 'summary'] ?? '');
+        $slug = trim((string) ($detail['slug'] ?? ''), '/');
+        if ($slug === '') {
+            $slug = trim((string) ($detail['id'] ?? ''), '/');
+        }
+
+        $localizedSlugs = [];
+        $slugs = is_array($detail['slugs'] ?? null) ? $detail['slugs'] : [];
+        foreach ($slugs as $language => $localizedSlug) {
+            if (is_scalar($localizedSlug) && trim((string) $localizedSlug) !== '') {
+                $localizedSlugs[(string) $language] = PublicPagePaths::routePath($routeKey, (string) $language)
+                    . '/' . trim((string) $localizedSlug, '/');
+            }
+        }
+        if ($localizedSlugs === []) {
+            $localizedSlugs[$locale] = PublicPagePaths::routePath($routeKey, $locale) . '/' . $slug;
+        }
+
+        $page = $template;
+        $page['title'] = $title;
+        $page['excerpt'] = $excerpt;
+        $page['meta_title'] = $title;
+        $page['meta_description'] = $excerpt;
+        $page['slug'] = $localizedSlugs[$locale] ?? ($localizedSlugs[array_key_first($localizedSlugs)] ?? $slug);
+        $page['localized_slugs'] = $localizedSlugs;
+        $page['canonical_url'] = '/' . $locale . '/' . ltrim($page['slug'], '/');
+        $page['robots'] = 'index, follow';
+
+        return $page;
     }
 
     /** @return array<string, mixed>|null */
@@ -319,9 +433,16 @@ final class PageResolver
         return $urls;
     }
 
-    /** @return array{outcome: 'redirect', redirect: array{path: string, status: int}, page: null} */
+    /**
+     * @return array{outcome: 'redirect', redirect: array{path: string, status: int}, page: null, context: array<string, mixed>}
+     */
     private function redirectResult(string $path, int $status): array
     {
-        return ['outcome' => 'redirect', 'redirect' => ['path' => $path, 'status' => $status], 'page' => null];
+        return [
+            'outcome' => 'redirect',
+            'redirect' => ['path' => $path, 'status' => $status],
+            'page' => null,
+            'context' => [],
+        ];
     }
 }
