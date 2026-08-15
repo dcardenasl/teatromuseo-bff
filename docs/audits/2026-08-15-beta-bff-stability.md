@@ -11,8 +11,9 @@ páginas.
 
 - Web: `https://beta.teatromuseo.cl`
 - BFF: `https://bff.teatromuseo.cl`
-- Rutas verificadas: `home`, `contacto`, `teatroescuela`, `cartelera` y
-  `museo/coleccion`.
+- Rutas verificadas: `home`, `contacto`, `teatroescuela`, `cartelera`,
+  `museo/coleccion`, una entrada CMS, una ficha de evento y una muestra
+  distribuida del sitemap.
 - La bitácora no contiene claves, tokens ni configuración sensible.
 
 ## Registro del proceso
@@ -96,12 +97,39 @@ páginas.
   home `87361 B`, contacto `50160 B`, TeatroEscuela `101575 B`, Cartelera
   `109338 B` y Catálogo `44328 B`.
 
+### 2026-08-15 — cutover completo Web→BFF
+
+- Se desplegaron los lectores de detalle y la composición de página del BFF,
+  junto con los controladores de detalle de Event y Catalog del Web.
+- El BFF reutiliza la plantilla singleton `template_event_item` o
+  `template_catalog_item` y entrega el detalle como contexto presembrado; el
+  Web renderiza el envelope sin volver a consultar el dominio ni la plantilla.
+- Se activó en beta `WEB_PAGE_DELIVERY_BFF_ALL_ROUTES=true`. Las rutas fuera del
+  manifest de snapshots continúan siendo síncronas y no generan snapshots
+  ilimitados.
+- La invalidación posterior al despliegue devolvió `200`, invalidó 17
+  snapshots y eliminó 39 respuestas HTML registradas para `es`.
+- El canario final devolvió `200` para nueve rutas públicas: home, contacto,
+  TeatroEscuela, Cartelera, catálogo, nosotros, historia, una entrada CMS y
+  una ficha de evento. Cada una registró exactamente una llamada Web→BFF al
+  endpoint `page-resolve`; el runtime no preserva siempre `X-Request-ID`, por
+  lo que la correlación operativa usa `request_path` y el último evento
+  exitoso.
+- El sitemap español contiene 842 URLs. Una muestra serial de 32 URLs devolvió
+  32/32 `200`; la auditoría de telemetría encontró 32/32 resoluciones BFF
+  exitosas. La muestra incluyó 14 fichas de Cartelera, entradas CMS,
+  compañías, vídeos y TeatroEscuela. No se afirma un crawl completo de las
+  842 URLs.
+- El listado de catálogo real respondió `200` con colección vacía; el
+  identificador `TMP-001` usado por la prueba hermética no existe en beta y
+  su `404` es el resultado esperado, no una falla de despliegue.
+
 ## Gates de calidad
 
-- BFF `composer quality`: `166` tests, `472` assertions, salida `0`; PHPStan,
+- BFF `composer quality`: `170` tests, `504` assertions, salida `0`; PHPStan,
   CS-Fixer y arquitectura sin errores. PHPUnit reportó una deprecación y un
   test omitido ya conocidos por la suite.
-- Web `composer quality`: `473` tests, `1.759` assertions, salida `0`; PHPStan,
+- Web `composer quality`: `480` tests, `1.798` assertions, salida `0`; PHPStan,
   CS-Fixer, i18n y fixture policy sin errores. La suite reportó cinco tests
   omitidos ya conocidos.
 - Ambos gates se ejecutaron con PHP `8.5.5`; CS-Fixer mostró la advertencia
@@ -110,16 +138,14 @@ páginas.
 
 ## Próximos gates
 
-1. Ejecutar `composer quality` en BFF y Web.
-2. Completar la ventana de estabilidad de `WEB-BFF-04`/Fase 2 con smoke y
-   observabilidad del runtime.
-3. Confirmar el gate operativo pendiente de preview firmado con
-   `CMS_PREVIEW_SECRET` configurado de forma consistente en BFF, CMS y Admin.
-4. Ejecutar una prueba positiva contra un borrador real ya existente, o
-   autorizar una ventana controlada para crear y limpiar un fixture temporal;
-   no se modifica producción sin esa autorización explícita.
-5. Solo con esos gates verdes, ejecutar `WEB-PAGE-07` y `BFF-PAGE-09` para
-   retirar el pipeline y las rutas HTTP públicas legacy.
+1. Mantener la ventana de estabilidad con los canarios y la telemetría de
+   `page-resolve`; el cutover completo está activo, pero el pipeline legacy se
+   conserva como rollback.
+2. Repetir, si se requiere una garantía estadística mayor, el muestreo del
+   sitemap sin convertirlo en un crawl permanente de producción.
+3. Solo después de cerrar la ventana operativa y revisar `REL-01`, ejecutar
+   `WEB-PAGE-07` y `BFF-PAGE-09` para retirar el pipeline y las rutas HTTP
+   públicas legacy.
 
 ## Automatización pendiente
 
