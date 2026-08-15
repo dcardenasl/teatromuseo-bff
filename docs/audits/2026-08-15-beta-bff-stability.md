@@ -1,0 +1,94 @@
+# Auditoría: estabilidad BFF/Web en beta
+
+## Objetivo
+
+Confirmar que `beta.teatromuseo.cl` resuelve páginas públicas mediante el BFF,
+que el BFF puede leer las bases de datos públicas y que la autorización
+Web→BFF está alineada antes de avanzar a la Fase 3 del plan de resolución de
+páginas.
+
+## Entorno
+
+- Web: `https://beta.teatromuseo.cl`
+- BFF: `https://bff.teatromuseo.cl`
+- Rutas verificadas: `home`, `contacto`, `teatroescuela`, `cartelera` y
+  `museo/coleccion`.
+- La bitácora no contiene claves, tokens ni configuración sensible.
+
+## Registro del proceso
+
+### 2026-08-15 — diagnóstico inicial
+
+- `/health` de beta devolvía `500` y las páginas públicas no cargaban.
+- El `.env` remoto de Web no contenía las variables obligatorias
+  `WEB_TRACKING_API_BASE_URL`, `BFF_API_BASE_URL` y `BFF_API_KEY`.
+- Se agregaron las variables faltantes sin exponer sus valores.
+
+### 2026-08-15 — autorización Web→BFF
+
+- Tras corregir el arranque, el BFF respondía `401 Unauthorized` al usar la
+  clave configurada en Web.
+- La misma consulta respondía `200` al usar la clave efectiva del BFF.
+- Comparación interna: las claves Web/BFF no coincidían.
+- Se alineó únicamente `BFF_API_KEY` del `.env` remoto de Web con la clave del
+  BFF.
+
+## Hallazgos
+
+### Hallazgo 1 — datos de base de datos disponibles
+
+- `page-resolve/contacto` respondió `200` con una página CMS.
+- `page-resolve/teatroescuela` respondió `200` con una página de colección.
+- `layout` respondió `200` con navegación, colecciones y settings.
+- Conclusión: no era una ausencia de registros ni un fallo de conexión a las
+  bases de datos del BFF.
+
+### Hallazgo 2 — desalineación de credenciales
+
+- Síntoma: Web mostraba `404` para páginas que existían.
+- Causa confirmada: el BFF rechazaba la petición Web con `401`; Web trataba el
+  resultado no resoluble como `404`.
+- Corrección: alinear `BFF_API_KEY` en la configuración remota de Web.
+
+## Evidencia posterior a la corrección
+
+- BFF `page-resolve/home`: `200`.
+- BFF `page-resolve/contacto`: `200`.
+- BFF `page-resolve/teatroescuela`: `200`.
+- BFF `page-bootstrap/contacto`: `200`, página presente.
+- BFF `page-bootstrap/teatroescuela`: `200`, página presente.
+- BFF `layout`: `200`, datos de layout presentes.
+- Beta `/health`: `200`.
+- Beta `/es`: `200`.
+- Beta `/es/contacto`: `200`.
+- Beta `/es/teatroescuela`: `200`.
+- Beta `/es/cartelera`: `200`.
+- Beta `/es/museo/coleccion`: `200`.
+
+## Gates de calidad
+
+- BFF `composer quality`: `166` tests, `472` assertions, salida `0`; PHPStan,
+  CS-Fixer y arquitectura sin errores. PHPUnit reportó una deprecación y un
+  test omitido ya conocidos por la suite.
+- Web `composer quality`: `473` tests, `1.759` assertions, salida `0`; PHPStan,
+  CS-Fixer, i18n y fixture policy sin errores. La suite reportó cinco tests
+  omitidos ya conocidos.
+- Ambos gates se ejecutaron con PHP `8.5.5`; CS-Fixer mostró la advertencia
+  informativa de que el proyecto soporta PHP mínimo `8.2`, sin detectar cambios
+  ni fallos.
+
+## Próximos gates
+
+1. Ejecutar `composer quality` en BFF y Web.
+2. Completar la ventana de estabilidad de `WEB-BFF-04`/Fase 2 con smoke y
+   observabilidad del runtime.
+3. Confirmar el gate operativo pendiente de preview firmado con
+   `CMS_PREVIEW_SECRET` configurado de forma consistente en BFF, CMS y Admin.
+4. Solo con esos gates verdes, ejecutar `WEB-PAGE-07` y `BFF-PAGE-09` para
+   retirar el pipeline y las rutas HTTP públicas legacy.
+
+## Automatización pendiente
+
+- Agregar a los smoke/deploy checks una validación no sensible que confirme que
+  Web y BFF aceptan la misma aplicación autorizada, evitando que una
+  desalineación de `BFF_API_KEY` se manifieste como un `404` de contenido.
