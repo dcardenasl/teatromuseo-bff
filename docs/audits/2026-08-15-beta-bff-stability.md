@@ -65,6 +65,37 @@ páginas.
 - Beta `/es/cartelera`: `200`.
 - Beta `/es/museo/coleccion`: `200`.
 
+### Preview y observabilidad
+
+- Se configuró un secreto aleatorio de 64 caracteres, idéntico en los `.env`
+  remotos de BFF, CMS y Admin. El valor no se registró.
+- `page-bootstrap/contacto` con firma válida respondió `200` y marcó
+  `meta.query.preview=true`.
+- La misma ruta con firma inválida respondió `200` pero marcó
+  `meta.query.preview=false`, demostrando el cierre seguro del camino no
+  autorizado. La prueba usó una página publicada; no se creó ni modificó un
+  borrador en producción.
+- El diagnóstico protegido de Web confirmó `200`, cache probe `passed` y
+  bases CMS/Catalog/Event `healthy`.
+
+### Corrección adicional del contrato de health
+
+- El diagnóstico de Web consultaba `/api/v1/health`, pero el BFF solo exponía
+  el mismo contrato en `/health`; la ruta versionada devolvía `404`.
+- Se cargó el mismo archivo de rutas de health en raíz y bajo `/api/v1`, con
+  una regresión específica. Commit `8e3282e`; se desplegó únicamente
+  `app/Config/Routes.php`.
+- Verificación remota: `/health`, `/api/v1/health`, `/ready` y
+  `/api/v1/ready` devuelven `200`.
+
+### Canary de estabilidad
+
+- Cinco iteraciones consecutivas de home, contacto, TeatroEscuela, Cartelera y
+  Catálogo devolvieron `200` con SHA-256 estable dentro de cada ruta.
+- Una segunda ronda de tres iteraciones confirmó tamaños estables:
+  home `87361 B`, contacto `50160 B`, TeatroEscuela `101575 B`, Cartelera
+  `109338 B` y Catálogo `44328 B`.
+
 ## Gates de calidad
 
 - BFF `composer quality`: `166` tests, `472` assertions, salida `0`; PHPStan,
@@ -84,7 +115,10 @@ páginas.
    observabilidad del runtime.
 3. Confirmar el gate operativo pendiente de preview firmado con
    `CMS_PREVIEW_SECRET` configurado de forma consistente en BFF, CMS y Admin.
-4. Solo con esos gates verdes, ejecutar `WEB-PAGE-07` y `BFF-PAGE-09` para
+4. Ejecutar una prueba positiva contra un borrador real ya existente, o
+   autorizar una ventana controlada para crear y limpiar un fixture temporal;
+   no se modifica producción sin esa autorización explícita.
+5. Solo con esos gates verdes, ejecutar `WEB-PAGE-07` y `BFF-PAGE-09` para
    retirar el pipeline y las rutas HTTP públicas legacy.
 
 ## Automatización pendiente
