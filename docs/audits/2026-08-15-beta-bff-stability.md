@@ -144,12 +144,14 @@ de páginas.
   renderizadores y controladores públicos del Web.
 - Beta `/health`, `/es`, `/es/contacto` y `/es/cartelera` devolvieron `200`.
 - Las rutas retiradas continuaron devolviendo `404` después del deploy.
-- La prueba directa de `page-resolve` con las claves locales disponibles
-  devolvió `401`, igual que la invalidación de caché. No se modificaron claves
-  remotas ni se registraron valores sensibles: las claves del `.env` local no
-  son la fuente autoritativa del hosting. Por tanto, el smoke del Web confirma
-  el comportamiento público desplegado, pero la verificación directa de
-  autorización Web→BFF debe repetirse con la clave efectiva del hosting.
+- La prueba directa de `page-resolve` contra `bff.teatromuseo.cl` con las
+  claves BFF locales disponibles devolvió `401`; esas claves no son la fuente
+  autoritativa del hosting y no se registraron sus valores. El Web, después de
+  purgar caché, siguió devolviendo `200`, por lo que su configuración remota sí
+  está autorizando el flujo público.
+- `GET /cache/status` respondió `200` y la invalidación posterior al deploy
+  respondió `200`: se invalidaron 50 snapshots y se eliminaron 3.236 respuestas
+  de caché para los scopes públicos solicitados.
 
 ## Gates de calidad
 
