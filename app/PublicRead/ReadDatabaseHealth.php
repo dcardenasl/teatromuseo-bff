@@ -6,7 +6,13 @@ namespace App\PublicRead;
 
 use Throwable;
 
-/** Probes the four explicit read-only groups without exposing connection data. */
+/**
+ * Probes the four explicit read-only groups without exposing connection data.
+ *
+ * Test runs stay hermetic even when a developer's local .env contains the
+ * production-style read-only connection variables. A database-backed test
+ * run must opt in explicitly with BFF_TEST_REAL_READ_DATABASES=true.
+ */
 final class ReadDatabaseHealth
 {
     /** @return array<string, array{status: string, response_time_ms?: float, message?: string}> */
@@ -23,7 +29,7 @@ final class ReadDatabaseHealth
         foreach ($groups as $name => $definition) {
             $group = $definition['group'];
             $prefix = $definition['prefix'];
-            if (defined('ENVIRONMENT') && ENVIRONMENT === 'testing' && ! $this->isConfigured($prefix)) {
+            if ($this->skipDatabaseProbeInTesting() || (defined('ENVIRONMENT') && ENVIRONMENT === 'testing' && ! $this->isConfigured($prefix))) {
                 $checks[$name] = ['status' => 'skipped', 'message' => 'read-only database not configured for tests'];
                 continue;
             }
@@ -65,5 +71,16 @@ final class ReadDatabaseHealth
         return trim((string) env($prefix . '_DB_HOSTNAME', '')) !== ''
             && trim((string) env($prefix . '_DB_DATABASE', '')) !== ''
             && trim((string) env($prefix . '_DB_USERNAME', '')) !== '';
+    }
+
+    private function skipDatabaseProbeInTesting(): bool
+    {
+        if (! defined('ENVIRONMENT') || ENVIRONMENT !== 'testing') {
+            return false;
+        }
+
+        $optIn = getenv('BFF_TEST_REAL_READ_DATABASES');
+
+        return $optIn === false || ! filter_var($optIn, FILTER_VALIDATE_BOOLEAN);
     }
 }

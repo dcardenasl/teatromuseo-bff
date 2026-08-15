@@ -7,13 +7,11 @@ declare(strict_types=1);
 $publicReadFilters = ['webappkey', 'throttle', 'correlationid', 'publicTelemetry'];
 
 $routes->group('public-read', ['namespace' => '\\App\\Controllers\\Api\\V1\\PublicRead', 'filter' => $publicReadFilters], static function ($routes): void {
-    $routes->get('(:segment)/layout', 'CmsPublicReadController::layout/$1');
     $routes->get('(:segment)/navigation', 'CmsPublicReadController::navigation/$1');
     $routes->get('(:segment)/settings', 'CmsPublicReadController::settings/$1');
     $routes->get('(:segment)/pages', 'CmsPublicReadController::pages/$1');
     $routes->get('(:segment)/pages/(.+)', 'CmsPublicReadController::page/$1/$2');
     $routes->get('(:segment)/page-resolve/(:any)', 'PageResolutionController::show/$1/$2');
-    $routes->get('(:segment)/page-bootstrap/(.+)', 'CmsPublicReadController::pageBootstrap/$1/$2');
     $routes->get('(:segment)/entries/(:segment)', 'CmsPublicReadController::entries/$1/$2');
     $routes->get('(:segment)/entries/(:segment)/(:any)', 'CmsPublicReadController::entry/$1/$2/$3');
     $routes->get('(:segment)/collection-items', 'CatalogPublicReadController::index/$1');

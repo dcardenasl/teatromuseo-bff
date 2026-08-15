@@ -16,11 +16,6 @@ use Throwable;
 /** Direct, read-only CMS public-read controller. */
 final class CmsPublicReadController extends PublicReadSupport
 {
-    public function layout(string $locale): ResponseInterface
-    {
-        return $this->result(Services::publicReadCms()->layout->show($locale));
-    }
-
     public function navigation(string $locale): ResponseInterface
     {
         return $this->result(Services::publicReadCms()->navigation->show($locale));
@@ -67,15 +62,6 @@ final class CmsPublicReadController extends PublicReadSupport
     {
         try {
             return $this->result(Services::publicReadCms()->pages->byType($locale, $type));
-        } catch (Throwable $exception) {
-            return $this->failure($locale, $exception);
-        }
-    }
-
-    public function pageBootstrap(string $locale, string $path): ResponseInterface
-    {
-        try {
-            return $this->result(Services::publicReadCms()->pageBootstrap->show($locale, $path, $this->fields([], []), $this->verifiedPagePreview($locale, $path)));
         } catch (Throwable $exception) {
             return $this->failure($locale, $exception);
         }

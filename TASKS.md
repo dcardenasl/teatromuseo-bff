@@ -10,6 +10,10 @@
 > [`../docs/plan/2026-08-13-plan-bff.md`](../docs/plan/2026-08-13-plan-bff.md)
 > (piloto original, solo CMS). Los cierres anteriores están en
 > [`TASKS_ARCHIVE.md`](TASKS_ARCHIVE.md).
+>
+> Las comprobaciones de `layout` y `page-bootstrap` registradas antes de
+> BFF-PAGE-09 son evidencia histórica; el contrato HTTP vigente de página
+> completa es `page-resolve`.
 
 ## ✅ Completadas
 
@@ -226,16 +230,15 @@ en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
-- [ ] **BFF-PAGE-09 — Fase 3: retiro del HTTP público de `layout`/
-  `page-bootstrap`.** Solo tras verificar Fase 2 estable en Web (mismo gate
-  que `WEB-BFF-04`). Borra el controlador/rutas que exponían `layout` y
-  `page-bootstrap` por HTTP público; `PublicReadLayoutReader`/
-  `PublicReadPageBootstrapReader` se conservan como colaboradores internos
-  de `PageResolver`, no se borran como clase. Preflight local 2026-08-14:
-  canary BFF de 5 iteraciones por `home`, `contacto` y `teatroescuela`, todas
-  `200` con payload estable. El retiro queda pendiente del mismo gate de
-  estabilidad/cutover de Web; no se eliminan rutas públicas mientras existan
-  consumidores legacy no migrados.
+- [x] **BFF-PAGE-09 — Fase 3: retiro del HTTP público de `layout`/
+  `page-bootstrap`.** Cerrada 2026-08-15 después del gate de estabilidad de
+  Web. Se retiraron ambas rutas y el controlador ya no las expone; los
+  lectores `PublicReadLayoutReader` y `PublicReadPageBootstrapReader` se
+  conservan únicamente como colaboradores internos de `PageResolver`. El
+  contrato público único de composición es ahora `page-resolve`. Verificado
+  con quality completo y smoke posterior al despliegue: endpoints retirados
+  devuelven `404`, mientras `page-resolve` y las páginas beta permanecen
+  operativos.
 
 ### BFF de lectura directa a 4 BDs (2026-08-13) — ver `../docs/plan/2026-08-13-plan-bff-completo.md`
 

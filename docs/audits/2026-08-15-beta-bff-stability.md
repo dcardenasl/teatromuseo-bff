@@ -1,5 +1,10 @@
 # Auditoría: estabilidad BFF/Web en beta
 
+> Nota de corte: las comprobaciones de `layout` y `page-bootstrap` que siguen
+> son evidencia histórica del pre-cutover del 2026-08-15. Desde BFF-PAGE-09
+> ambas rutas HTTP están retiradas; el contrato público vigente es
+> `page-resolve`, verificado en la sección de despliegue posterior.
+
 ## Objetivo
 
 Confirmar que `beta.teatromuseo.cl` resuelve páginas públicas mediante el BFF,
@@ -36,11 +41,11 @@ páginas.
 
 ## Hallazgos
 
-### Hallazgo 1 — datos de base de datos disponibles
+### Hallazgo 1 — datos de base de datos disponibles (pre-cutover)
 
 - `page-resolve/contacto` respondió `200` con una página CMS.
 - `page-resolve/teatroescuela` respondió `200` con una página de colección.
-- `layout` respondió `200` con navegación, colecciones y settings.
+- `layout` respondió `200` con navegación, colecciones y settings (pre-cutover).
 - Conclusión: no era una ausencia de registros ni un fallo de conexión a las
   bases de datos del BFF.
 
@@ -56,9 +61,9 @@ páginas.
 - BFF `page-resolve/home`: `200`.
 - BFF `page-resolve/contacto`: `200`.
 - BFF `page-resolve/teatroescuela`: `200`.
-- BFF `page-bootstrap/contacto`: `200`, página presente.
-- BFF `page-bootstrap/teatroescuela`: `200`, página presente.
-- BFF `layout`: `200`, datos de layout presentes.
+- BFF `page-bootstrap/contacto`: `200`, página presente (pre-cutover).
+- BFF `page-bootstrap/teatroescuela`: `200`, página presente (pre-cutover).
+- BFF `layout`: `200`, datos de layout presentes (pre-cutover).
 - Beta `/health`: `200`.
 - Beta `/es`: `200`.
 - Beta `/es/contacto`: `200`.
@@ -104,9 +109,9 @@ páginas.
 - El BFF reutiliza la plantilla singleton `template_event_item` o
   `template_catalog_item` y entrega el detalle como contexto presembrado; el
   Web renderiza el envelope sin volver a consultar el dominio ni la plantilla.
-- Se activó en beta `WEB_PAGE_DELIVERY_BFF_ALL_ROUTES=true`. Las rutas fuera del
-  manifest de snapshots continúan siendo síncronas y no generan snapshots
-  ilimitados.
+- Todas las rutas públicas localizadas quedaron bajo `page-resolve`. Las rutas
+  fuera del manifest de snapshots continúan siendo síncronas y no generan
+  snapshots ilimitados.
 - La invalidación posterior al despliegue devolvió `200`, invalidó 17
   snapshots y eliminó 39 respuestas HTML registradas para `es`.
 - El canario final devolvió `200` para nueve rutas públicas: home, contacto,
@@ -124,6 +129,14 @@ páginas.
   identificador `TMP-001` usado por la prueba hermética no existe en beta y
   su `404` es el resultado esperado, no una falla de despliegue.
 
+### 2026-08-15 — retiro de endpoints legacy
+
+- `GET /api/v1/public-read/es/layout`: `404` esperado.
+- `GET /api/v1/public-read/es/page-bootstrap/contacto`: `404` esperado.
+- `GET /api/v1/public-read/es/page-resolve/contacto`: `200`.
+- Las páginas beta siguen devolviendo `200` y el Web mantiene una sola llamada
+  BFF por página pública.
+
 ## Gates de calidad
 
 - BFF `composer quality`: `170` tests, `504` assertions, salida `0`; PHPStan,
@@ -139,13 +152,9 @@ páginas.
 ## Próximos gates
 
 1. Mantener la ventana de estabilidad con los canarios y la telemetría de
-   `page-resolve`; el cutover completo está activo, pero el pipeline legacy se
-   conserva como rollback.
+   `page-resolve`.
 2. Repetir, si se requiere una garantía estadística mayor, el muestreo del
    sitemap sin convertirlo en un crawl permanente de producción.
-3. Solo después de cerrar la ventana operativa y revisar `REL-01`, ejecutar
-   `WEB-PAGE-07` y `BFF-PAGE-09` para retirar el pipeline y las rutas HTTP
-   públicas legacy.
 
 ## Automatización pendiente
 
