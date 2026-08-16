@@ -57,6 +57,10 @@
   2026-08-16. Se añadió `get()` para lecturas JSON autenticadas sin alterar
   `forward()`; verificado con test unitario de URL, bearer y envelope.
 
+- [x] **BFF-DASH-02 — Configurar `BFF_DOMAINS` real.** Cerrada 2026-08-16.
+  Se configuraron cms/catalog/event en `.env` y `.env.example`; verificado
+  con test de parseo y resolución de las tres instancias de `DomainClient`.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -275,9 +279,6 @@ de dominio por su cuenta y puede delegarlas aquí. No toca `aggregate()` ni el
 endpoint de ejemplo existente — agrega una primitiva y un endpoint nuevos.
 Sin iniciar; no bloquea ni compite con el trabajo de `page-resolve`.
 
-- [ ] **BFF-DASH-02 — Configurar `BFF_DOMAINS` real** (cms/catalog/event) en
-  `.env`/`.env.example`. Hoy `Services::domainClient()` lanzaría
-  `InvalidArgumentException`. Sin dependencias.
 - [ ] **BFF-DASH-03 — `BaseProxyController::aggregatePartial()`.** Primitiva
   nueva, secuencial, que captura el fallo de cada fuente por separado en vez
   de abortar todo (a diferencia de `aggregate()`, que se mantiene fail-fast
