@@ -140,7 +140,14 @@ abstract class BaseProxyController extends Controller
                     'state' => 'ok',
                     'data'  => $call(),
                 ];
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
+                log_message('error', sprintf(
+                    'Partial aggregate source "%s" unavailable: %s: %s',
+                    $key,
+                    $exception::class,
+                    $exception->getMessage(),
+                ));
+
                 $data[$key] = [
                     'state' => 'unavailable',
                     'data'  => [],
