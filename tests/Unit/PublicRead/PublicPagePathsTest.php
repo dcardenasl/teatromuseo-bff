@@ -41,6 +41,17 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertFalse(PublicPagePaths::isLegacyPublicBasePath('/public/en', 'es'));
     }
 
+    public function testExportsTheVersionedRouteContract(): void
+    {
+        $contract = PublicPagePaths::publicRouteContract();
+
+        self::assertSame(1, $contract['version']);
+        self::assertSame(['es', 'en', 'fr', 'pt'], $contract['locales']);
+        self::assertSame('programmation', $contract['routes']['events']['fr']);
+        self::assertContains('programmation', $contract['aliases']['events']);
+        self::assertSame('musee/collection', $contract['routes']['catalog']['fr']);
+    }
+
     public function testResolvesCmsPageAndPreservesTheSourcePageType(): void
     {
         $redirects = $this->createMock(RedirectReaderInterface::class);

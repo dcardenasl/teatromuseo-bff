@@ -45,3 +45,30 @@ jobs:
 
       - name: Run quality suite
         run: composer quality
+
+  public-route-contract:
+    name: Web/BFF public route contract parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout BFF
+        uses: actions/checkout@v4
+
+      - name: Checkout Web contract source
+        uses: actions/checkout@v4
+        with:
+          repository: dcardenasl/teatromuseo-web
+          ref: dev
+          path: web-contract
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Compare the BFF adapter with the Web contract
+        run: |
+          php scripts/export-public-route-contract.php > /tmp/bff-public-routes.json
+          php web-contract/scripts/export-public-route-contract.php > /tmp/web-public-routes.json
+          diff --unified=0 /tmp/web-public-routes.json /tmp/bff-public-routes.json

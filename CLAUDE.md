@@ -31,6 +31,12 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
   enforced by the hub/domain on every call.
 - **No user storage.** Users live in the hub.
 
+The public route policy is versioned by the Web application in
+`teatromuseo-web/docs/contracts/public-routes.json`. This repository keeps
+`PublicPagePaths` as an incoming-path adapter and exports the same contract;
+do not change one adapter without updating the other and the cross-repository
+CI check.
+
 The BFF's job is: CORS, request shaping, response aggregation across
 hub + domain, optional service-token-based admin calls, and the Web's
 cross-domain public-read surface.

@@ -18,6 +18,13 @@
 > El saneamiento posterior al corte BFF-only se gestiona en
 > [`../docs/plan/2026-08-15-plan-robustez-web-bff.md`](../docs/plan/2026-08-15-plan-robustez-web-bff.md).
 
+## ✅ Robustez de contrato localizada
+
+- [x] **BFF-CONTRACT-01 — Paridad de rutas públicas.** Cerrada 2026-08-15.
+  `PublicPagePaths` exporta el contrato versionado de rutas y aliases; el CI
+  lo compara contra `teatromuseo-web/docs/contracts/public-routes.json` en
+  PHP 8.2. La independencia de despliegue se conserva.
+
 ## ✅ Completadas
 
 - [x] **BFF-ROBUST-01 — Nombres de composición interna.** Cerrada

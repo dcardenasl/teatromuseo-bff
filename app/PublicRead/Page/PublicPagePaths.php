@@ -152,4 +152,47 @@ final class PublicPagePaths
             default => '',
         };
     }
+
+    /**
+     * Export the framework-free public route contract used by the
+     * cross-repository CI parity check.
+     *
+     * The BFF must keep a local adapter for incoming-path resolution, but it
+     * must never silently invent a different visitor-facing route policy from
+     * the Web application.
+     *
+     * @return array<string, mixed>
+     */
+    public static function publicRouteContract(): array
+    {
+        $locales = ['es', 'en', 'fr', 'pt'];
+        $routeKeys = ['events', 'catalog', 'contact', 'history', 'theatre_school'];
+        $routes = ['homepage' => []];
+
+        foreach ($locales as $locale) {
+            $routes['homepage'][$locale] = self::homepageSegment($locale);
+        }
+        foreach ($routeKeys as $routeKey) {
+            $routes[$routeKey] = [];
+            foreach ($locales as $locale) {
+                $routes[$routeKey][$locale] = self::routePath($routeKey, $locale);
+            }
+        }
+
+        $aliases = ['homepage' => array_keys(self::HOMEPAGE_ALIASES)];
+        foreach (self::ROUTE_ALIASES as $alias => $routeKey) {
+            $aliases[$routeKey][] = $alias;
+        }
+        foreach ($aliases as &$routeAliases) {
+            sort($routeAliases);
+        }
+        unset($routeAliases);
+
+        return [
+            'version' => 1,
+            'locales' => $locales,
+            'routes' => $routes,
+            'aliases' => $aliases,
+        ];
+    }
 }
