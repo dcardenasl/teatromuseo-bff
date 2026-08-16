@@ -12,6 +12,7 @@ use dcardenasl\Ci4ApiCore\Http\ApiResponse;
 use dcardenasl\Ci4ApiCore\Http\Client\AbstractServiceClient;
 use dcardenasl\Ci4ApiCore\Support\ExceptionFormatter;
 use LogicException;
+use Throwable;
 
 /**
  * Base controller for BFF proxy/aggregator endpoints.
@@ -23,6 +24,9 @@ use LogicException;
  *  - {@see aggregate()} — combine N upstream calls into a single
  *    `ApiResponse::success([...])` envelope. Use when one client request
  *    fans out to multiple services.
+ *  - {@see aggregatePartial()} — combine independent calls while isolating
+ *    failures per source. Use when a degraded source must not hide healthy
+ *    sources from the client.
  *
  * Canonical {@see ApiException}s thrown by the underlying client are caught
  * here and rendered via {@see ExceptionFormatter} so the wire shape matches
@@ -94,6 +98,44 @@ abstract class BaseProxyController extends Controller
         } catch (ApiException $e) {
             return $this->respondWithException($e);
         }
+    }
+
+    /**
+     * Run each call sequentially and isolate its result under the source key.
+     *
+     * Each successful source is returned as `state: ok` with its decoded array
+     * under `data`; a source whose closure throws is returned as
+     * `state: unavailable` with an empty `data` array. This primitive is
+     * intentionally separate from {@see aggregate()}: that helper is the
+     * fail-fast contract used by existing consumers such as `/me/dashboard`
+     * and `UsersProxyController`, while this helper is for independent data
+     * sources where partial degradation is the desired response.
+     *
+     * Calls remain sequential by design. Introducing concurrency would be a
+     * separate change requiring an explicit review of ordering and failure
+     * semantics.
+     *
+     * @param array<string, callable(): array<string, mixed>> $calls
+     */
+    protected function aggregatePartial(array $calls): ResponseInterface
+    {
+        $data = [];
+
+        foreach ($calls as $key => $call) {
+            try {
+                $data[$key] = [
+                    'state' => 'ok',
+                    'data'  => $call(),
+                ];
+            } catch (Throwable) {
+                $data[$key] = [
+                    'state' => 'unavailable',
+                    'data'  => [],
+                ];
+            }
+        }
+
+        return $this->response->setJSON(ApiResponse::success($data));
     }
 
     private function respondWithException(ApiException $e): ResponseInterface
