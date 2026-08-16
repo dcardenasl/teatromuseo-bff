@@ -35,6 +35,14 @@
 
 ## ✅ Completadas
 
+- [x] **WEB-BFF-NAV-01 — Contrato de destinos opcionales del menú.** Cerrada
+  2026-08-16. `PageEnvelope` delega la resolución a
+  `PublicMenuUrlResolver`, publica `custom_url: null` e `is_clickable: false`
+  cuando el CMS no define un destino y preserva rutas CMS, rutas conocidas y
+  URLs editoriales válidas. Se cubren destinos válidos, ausentes, `#` y datos
+  malformados sin conversiones inseguras. Quality BFF quedó verde.
+  Fuente: [`../docs/plan/2026-08-15-plan-robustez-web-bff.md`](../docs/plan/2026-08-15-plan-robustez-web-bff.md).
+
 - [x] **BFF-ROBUST-01 — Nombres de composición interna.** Cerrada
   2026-08-15. `PublicReadLayoutReader` y `PublicReadPageBootstrapReader` se
   renombraron a `LayoutCompositionReader` y `PageBootstrapCompositionReader`;

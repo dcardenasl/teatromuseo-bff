@@ -128,6 +128,7 @@ final class PublicReadContainer
             ),
             layout: $cms->layout,
             blocks: self::blockTreeFor($cms),
+            menuUrls: new Page\PublicMenuUrlResolver(),
         );
     }
 

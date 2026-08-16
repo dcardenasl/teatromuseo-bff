@@ -16,6 +16,7 @@ final readonly class PageEnvelope
         private PageResolver $resolver,
         private LayoutCompositionReader $layout,
         private BlockTreeResolver $blocks,
+        private PublicMenuUrlResolver $menuUrls,
     ) {
     }
 
@@ -242,32 +243,9 @@ final readonly class PageEnvelope
                 continue;
             }
             $item = $rawItem;
-            $navigation = is_array($item['navigation'] ?? null) ? $item['navigation'] : [];
-            $routeKey = (string) ($navigation['route_key'] ?? '');
-            $targetType = (string) ($navigation['target_type'] ?? '');
-            $collectionSlug = trim((string) ($navigation['collection_slug'] ?? ''), '/');
-            if ($collectionSlug === '') {
-                $collectionSlug = $collectionSlugs[(int) ($navigation['target_id'] ?? 0)] ?? '';
-            }
-            $entrySlug = trim((string) ($navigation['slug'] ?? ''), '/');
-            if (in_array($targetType, ['collection_listing', 'entry'], true) && $collectionSlug !== '') {
-                $item['custom_url'] = '/' . $collectionSlug . ($targetType === 'entry' && $entrySlug !== '' ? '/' . $entrySlug : '');
-            } else {
-                $routePath = PublicPagePaths::routePath($routeKey, $locale);
-                if ($routePath !== '') {
-                    $item['custom_url'] = '/' . $routePath;
-                } else {
-                    $candidate = (string) ($item['custom_url'] ?? $item['url'] ?? '');
-                    if ($routeKey === 'pages' && $entrySlug !== '') {
-                        $candidate = PublicPagePaths::canonicalPath($entrySlug, $locale) !== null
-                            ? '/' . PublicPagePaths::canonicalPath($entrySlug, $locale)
-                            : '/' . $entrySlug;
-                    }
-                    if ($candidate !== '') {
-                        $item['custom_url'] = $candidate;
-                    }
-                }
-            }
+            $resolvedUrl = $this->menuUrls->resolve($item, $locale, $collectionSlugs);
+            $item['custom_url'] = $resolvedUrl;
+            $item['is_clickable'] = $resolvedUrl !== null;
             $children = $item['children'] ?? [];
             $item['children'] = is_array($children) ? $this->menuItems($children, $locale, $collectionSlugs) : [];
             $result[] = $item;
