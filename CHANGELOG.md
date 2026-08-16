@@ -30,3 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Runtime dependency** — upgraded `dcardenasl/ci4-api-core` to `v1.1.1`.
 - **Local deployment hygiene** — ignored local `.deploy` tooling so deployment helpers are not
   accidentally included in the BFF source tree.
+- **Menu item destinations** — CMS/catalog/event menu items now publish `is_clickable`
+  alongside `custom_url`, returning `custom_url: null` and `is_clickable: false` instead
+  of a broken/omitted URL when the CMS defines no valid destination.
