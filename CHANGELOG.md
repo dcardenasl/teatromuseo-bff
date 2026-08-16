@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`GET /api/v1/public-read/{locale}/page-resolve/{path}`** — domain detail pages
+  (`template_catalog_item`/`template_event_item`) now inherit their owning CMS
+  template's `robots`, `og_type`, `og_image` and `schema_data`, carry
+  `published_at`/`updated_at` from the underlying catalog/event record, and expose
+  `showPageHeading` (suppressed when a rendered block declares
+  `presentation.owns_page_heading`) plus a per-locale `localized_urls` map so
+  `teatromuseo-web` no longer has to rebuild them from route keys. The template's
+  `meta_description` is also truncated to the block's declared
+  `presentation.seo.description_max_length`, when set.
 - **`GET /api/v1/public-read/**` and `GET /api/v1/public/**`** — the BFF now serves CMS
   layout/pages/entries/taxonomy, Catalog collection items/facets, and Event
   listings/detail/types directly from four dedicated SELECT-only MySQL connections
