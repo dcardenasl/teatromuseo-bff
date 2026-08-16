@@ -29,6 +29,9 @@
   para detalles, incluido `fields=[]`; los listados no cambian su proyección.
   Las pruebas rápidas usan el builder SQL real sobre SQLite y CI añade una
   suite MySQL 8 efímera mediante `composer test:integration`.
+- [x] **BFF-CONTRACT-03 — Compatibilidad de plataforma.** Cerrada 2026-08-15.
+  La matriz PHP 8.2–8.5 se mantiene y el CI verifica explícitamente
+  `composer check-platform-reqs --no-dev`.
 
 ## ✅ Completadas
 

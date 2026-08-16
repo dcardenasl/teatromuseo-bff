@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Check Composer platform requirements
+        run: composer check-platform-reqs --no-dev
+
       - name: Configure .env for CI
         run: |
           cp .env.example .env
