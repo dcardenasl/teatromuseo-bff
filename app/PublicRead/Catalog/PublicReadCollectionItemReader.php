@@ -305,11 +305,17 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
 
         $slugMap = [];
         if ($this->needsSlugs($fields)) {
-            $slugResult = $this->db->table('catalog_public_slugs')
+            $slugQuery = $this->db->table('catalog_public_slugs')
                 ->select('resource_id, locale, slug')
                 ->where('resource_type', self::RESOURCE_TYPE)
-                ->whereIn('resource_id', $ids)
-                ->whereIn('locale', array_values(array_unique([$locale, $this->fallbackLocale])))
+                ->whereIn('resource_id', $ids);
+            // Detail/page resolution needs the complete language-link map,
+            // including the default full projection (`fields=[]`). List
+            // projections remain limited to the active/fallback locales.
+            if (! $detail && ! $this->needsField($fields, 'slugs')) {
+                $slugQuery->whereIn('locale', array_values(array_unique([$locale, $this->fallbackLocale])));
+            }
+            $slugResult = $slugQuery
                 ->orderBy('resource_id', 'ASC')->orderBy('locale', 'ASC')
                 ->get();
             $slugs = $slugResult !== false ? $slugResult->getResultArray() : [];

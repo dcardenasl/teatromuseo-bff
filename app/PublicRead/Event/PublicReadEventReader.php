@@ -242,10 +242,15 @@ SQL;
             $slugQuery = $this->db->table('event_public_slugs')
                 ->select('resource_id, locale, slug, updated_at, created_at')
                 ->where('resource_type', 'event')
-                ->whereIn('resource_id', $ids)
-                ->whereIn('locale', $candidates)
-                ->get();
-            $slugRows = $slugQuery !== false ? $slugQuery->getResultArray() : [];
+                ->whereIn('resource_id', $ids);
+            // Detail/page resolution needs the complete language-link map,
+            // including the default full projection (`fields=[]`). Listing
+            // projections remain limited to the requested locale + fallback.
+            if (! $detail && ! $this->wants($fields, 'slugs')) {
+                $slugQuery->whereIn('locale', $candidates);
+            }
+            $slugResult = $slugQuery->get();
+            $slugRows = $slugResult !== false ? $slugResult->getResultArray() : [];
             foreach ($slugRows as $slug) {
                 $id = (int) $slug['resource_id'];
                 $slugs[$id][(string) $slug['locale']] = (string) $slug['slug'];

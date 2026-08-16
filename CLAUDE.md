@@ -51,11 +51,18 @@ php spark serve --port 8188
 vendor/bin/phpunit                     # all
 vendor/bin/phpunit tests/Unit          # unit only
 vendor/bin/phpunit tests/Feature       # feature/HTTP
+composer test:integration               # opt-in MySQL public-read contract
 
 # Quality gates
 composer quality   # phpstan + cs-check + phpunit + arch-drift
 composer cs-fix    # auto-fix style
 ```
+
+`composer test:integration` requires `RUN_PUBLIC_READ_INTEGRATION=1` and a
+disposable MySQL 8 database configured through the named `*_READONLY_DB_*`
+variables. CI provisions that database; the BFF test fixture creates only the
+tables needed for the projection contract and never adds application
+migrations or write paths.
 
 ## Architecture cheat sheet
 

@@ -151,7 +151,12 @@ final class PublicPagePathsTest extends CIUnitTestCase
                     'title' => 'Festival Uno',
                     'description' => 'Descripción del festival uno.',
                     'slug' => 'festival-uno',
-                    'slugs' => ['es' => 'festival-uno'],
+                    'slugs' => [
+                        'es' => 'festival-uno',
+                        'en' => 'one-festival',
+                        'fr' => 'festival-un',
+                        'pt' => 'festival-um',
+                    ],
                     'localized' => [
                         'title' => 'Festival Uno',
                         'description' => 'Descripción del festival uno.',
@@ -171,6 +176,12 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame('template_event_item', $result['page']['source_page_type']);
         self::assertSame('Festival Uno', $result['page']['title']);
         self::assertSame('/es/cartelera/festival-uno', $result['page']['canonical_url']);
+        self::assertSame([
+            'es' => 'cartelera/festival-uno',
+            'en' => 'programming/one-festival',
+            'fr' => 'programmation/festival-un',
+            'pt' => 'programacao/festival-um',
+        ], $result['page']['localized_slugs']);
         self::assertSame('Festival Uno', $result['context']['event_item']['localized']['title']);
     }
 
@@ -198,7 +209,12 @@ final class PublicPagePathsTest extends CIUnitTestCase
                     'name' => 'Pieza de prueba',
                     'summary' => 'Resumen de prueba.',
                     'slug' => 'pieza-de-prueba',
-                    'slugs' => ['es' => 'pieza-de-prueba'],
+                    'slugs' => [
+                        'es' => 'pieza-de-prueba',
+                        'en' => 'test-piece',
+                        'fr' => 'piece-de-test',
+                        'pt' => 'peca-de-teste',
+                    ],
                     'localized' => [
                         'name' => 'Pieza localizada',
                         'summary' => 'Resumen localizado.',
@@ -217,6 +233,12 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame('template_catalog_item', $result['page']['source_page_type']);
         self::assertSame('Pieza localizada', $result['page']['title']);
         self::assertSame('/es/museo/coleccion/pieza-de-prueba', $result['page']['canonical_url']);
+        self::assertSame([
+            'es' => 'museo/coleccion/pieza-de-prueba',
+            'en' => 'museum/collection/test-piece',
+            'fr' => 'musee/collection/piece-de-test',
+            'pt' => 'museu/colecao/peca-de-teste',
+        ], $result['page']['localized_slugs']);
         self::assertSame('Pieza localizada', $result['context']['catalog_item']['localized']['name']);
     }
 

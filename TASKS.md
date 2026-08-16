@@ -24,6 +24,11 @@
   `PublicPagePaths` exporta el contrato versionado de rutas y aliases; el CI
   lo compara contra `teatromuseo-web/docs/contracts/public-routes.json` en
   PHP 8.2. La independencia de despliegue se conserva.
+- [x] **BFF-CONTRACT-02 — Slugs completos de detalle.** Cerrada 2026-08-15.
+  Los lectores SQL-first de Event y Catalog no aplican el filtro de locale
+  para detalles, incluido `fields=[]`; los listados no cambian su proyección.
+  Las pruebas rápidas usan el builder SQL real sobre SQLite y CI añade una
+  suite MySQL 8 efímera mediante `composer test:integration`.
 
 ## ✅ Completadas
 

@@ -46,6 +46,7 @@
         ],
         "test:unit": "phpunit --testsuite=Unit --configuration=phpunit.xml --no-coverage --testdox",
         "test:feature": "phpunit --testsuite=Feature --configuration=phpunit.xml --no-coverage --testdox",
+        "test:integration": "RUN_PUBLIC_READ_INTEGRATION=1 phpunit --configuration=phpunit.integration.xml --no-coverage",
         "test": "phpunit --configuration=phpunit.xml --no-coverage --testdox",
         "test:coverage": "phpunit --configuration=phpunit.xml --testdox",
         "phpstan": "phpstan analyse --memory-limit=512M",
