@@ -262,10 +262,11 @@
 
 ## 🟡 Próximo
 
-- [ ] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Fijar
-  OPcache o ajustar PHP-FPM únicamente mediante el mecanismo que el proveedor
-  cPanel confirme como efectivo. No se resuelve con un Dockerfile local ni
-  con un `www.conf` que el hosting no cargue. Ver el
+- [x] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Diferida y
+  descartada el 2026-08-16 por falta de control sobre el hosting. La cuenta
+  expone PHP Selector para PHP 8.2 y opciones PHP de usuario, pero no muestra
+  `opcache.*` ni `pm.max_children`; no se añadieron configuraciones locales ni
+  se harán cambios especulativos. Ver el
   [`plan detallado`](../docs/plan/2026-08-15-plan-robustez-web-bff.md).
 
 ### El BFF resuelve la página pública completa (2026-08-14) — ver `../docs/plan/2026-08-14-plan-bff-page-resolution.md`
