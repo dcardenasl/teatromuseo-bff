@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Me;
 
+use App\AdminRead\Contracts\AdminDashboardSourceInterface;
 use CodeIgniter\HTTP\CURLRequest;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
+use RuntimeException;
 use Tests\Support\ApiTestCase;
 
 final class AdminDashboardTest extends ApiTestCase
@@ -16,7 +18,6 @@ final class AdminDashboardTest extends ApiTestCase
         parent::setUp();
         putenv('hub.url=http://hub.test');
         putenv('hub.apiKey=test-key');
-        putenv('BFF_DOMAINS=cms:http://cms.test,catalog:http://catalog.test,event:http://event.test');
         Services::reset();
     }
 
@@ -24,7 +25,6 @@ final class AdminDashboardTest extends ApiTestCase
     {
         putenv('hub.url');
         putenv('hub.apiKey');
-        putenv('BFF_DOMAINS');
         Services::reset();
         parent::tearDown();
     }
@@ -54,10 +54,8 @@ final class AdminDashboardTest extends ApiTestCase
         $this->mockUpstreamCalls([
             $this->validIntrospection(),
             $this->summaryResponse(['users' => ['total' => 4]]),
-            $this->summaryResponse(['pages' => ['total' => 7]]),
-            $this->summaryResponse(['works' => ['total' => 12]]),
-            $this->summaryResponse(['events' => ['total' => 3]]),
         ]);
+        $this->mockDashboardSources();
 
         $result = $this
             ->withHeaders(['Authorization' => 'Bearer valid-token'])
@@ -72,7 +70,7 @@ final class AdminDashboardTest extends ApiTestCase
         $this->assertSame('ok', $body['data']['source']['catalog']);
         $this->assertSame('ok', $body['data']['source']['event']);
         $this->assertSame('ok', $body['data']['source']['state']);
-        $this->assertSame(['total' => 7], $body['data']['sections']['cms']['pages']);
+        $this->assertSame(['pages' => 7], $body['data']['sections']['cms']['counts']);
     }
 
     public function testReturns200WhenOneSourceDegrades(): void
@@ -80,11 +78,8 @@ final class AdminDashboardTest extends ApiTestCase
         $this->mockUpstreamCalls([
             $this->validIntrospection(),
             $this->summaryResponse(['users' => ['total' => 4]]),
-            $this->jsonResponse(503, ['message' => 'cms unavailable']),
-            $this->jsonResponse(503, ['message' => 'cms unavailable']),
-            $this->summaryResponse(['works' => ['total' => 12]]),
-            $this->summaryResponse(['events' => ['total' => 3]]),
         ]);
+        $this->mockDashboardSources(cmsThrows: true);
 
         $result = $this
             ->withHeaders(['Authorization' => 'Bearer valid-token'])
@@ -99,16 +94,17 @@ final class AdminDashboardTest extends ApiTestCase
         $this->assertSame('ok', $body['data']['source']['event']);
         $this->assertSame('partial', $body['data']['source']['state']);
         $this->assertSame([], $body['data']['sections']['cms']);
-        $this->assertSame(['total' => 12], $body['data']['sections']['catalog']['works']);
+        $this->assertSame(['collection_items' => 12], $body['data']['sections']['catalog']['counts']);
     }
 
     public function testReturns200WhenAllSourcesAreUnavailable(): void
     {
-        $responses = [$this->validIntrospection()];
-        for ($i = 0; $i < 8; $i++) {
-            $responses[] = $this->jsonResponse(503, ['message' => 'upstream unavailable']);
-        }
-        $this->mockUpstreamCalls($responses);
+        $this->mockUpstreamCalls([
+            $this->validIntrospection(),
+            $this->jsonResponse(503, ['message' => 'upstream unavailable']),
+            $this->jsonResponse(503, ['message' => 'upstream unavailable']),
+        ]);
+        $this->mockDashboardSources(allThrow: true);
 
         $result = $this
             ->withHeaders(['Authorization' => 'Bearer valid-token'])
@@ -144,9 +140,32 @@ final class AdminDashboardTest extends ApiTestCase
         return $this->jsonResponse(200, ['data' => [
             'valid'       => true,
             'uid'         => 42,
-            'permissions' => ['dashboard.view'],
+            'permissions' => [
+                'dashboard.view',
+                'cms.pages.read',
+                'catalog.collectionItem.read',
+                'event.events.read',
+            ],
             'exp'         => time() + 3600,
         ]]);
+    }
+
+    private function mockDashboardSources(bool $cmsThrows = false, bool $allThrow = false): void
+    {
+        foreach ([
+            'adminReadCmsDashboard' => ['counts' => ['pages' => 7]],
+            'adminReadCatalogDashboard' => ['counts' => ['collection_items' => 12]],
+            'adminReadEventDashboard' => ['counts' => ['events' => 3]],
+        ] as $service => $sections) {
+            $reader = $this->createMock(AdminDashboardSourceInterface::class);
+            $shouldThrow = $allThrow || ($cmsThrows && $service === 'adminReadCmsDashboard');
+            if ($shouldThrow) {
+                $reader->method('read')->willThrowException(new RuntimeException('source unavailable'));
+            } else {
+                $reader->method('read')->willReturn(['sections' => $sections]);
+            }
+            Services::injectMock($service, $reader);
+        }
     }
 
     /** @param array<string, mixed> $sections */

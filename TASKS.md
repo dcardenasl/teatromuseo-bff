@@ -88,6 +88,24 @@
   distingue el agregador fail-fast de referencia `/me/dashboard` del
   consumidor real `/me/admin-dashboard` con degradación parcial.
 
+- [x] **BFF-ADMINREAD-01 — Seam administrativo directo y contrato de permisos.**
+  Cerrada 2026-08-16. Se documentó ADR-009, se aisló `app/AdminRead/**` de
+  `PublicRead` y se mantuvieron modelos, escrituras y JWT fuera del BFF;
+  verificado con arquitectura y PHPStan.
+
+- [x] **BFF-ADMINREAD-02 — Lectores directos CMS/Catalog/Event.** Cerrada
+  2026-08-16. Se añadieron proyecciones `SELECT`-only, filtros de permisos y
+  soft delete con fail-closed ante errores; verificado con 4 tests / 9 asserts.
+
+- [x] **BFF-ADMINREAD-03 — Corte del endpoint Admin.** Cerrada 2026-08-16.
+  `/me/admin-dashboard` conserva el Hub autenticado y reemplaza las tres
+  llamadas HTTP de dominio por lectores directos, manteniendo el shape y la
+  degradación parcial; feature tests verdes.
+
+- [x] **BFF-ADMINREAD-04 — Tests, gates y smoke.** Cerrada 2026-08-16.
+  `composer test:unit` (155 tests / 464 asserts), `composer quality` (198 /
+  614), `php spark routes` y smoke local de `/health` pasaron.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -294,6 +312,10 @@
   Hub y las cuatro apps levantadas, `/health` y `/ready` del BFF devolvieron
   `200`; los secretos y credenciales concretos siguen siendo configuración de
   despliegue, no código.
+
+## 🔴 En progreso
+
+_(sin tareas en curso)_
 
 ## 🟡 Próximo
 

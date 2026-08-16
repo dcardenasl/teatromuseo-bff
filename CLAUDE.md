@@ -18,12 +18,14 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
 
 - **No owned/write database.** No migrations, no models, no repositories or
   writes. The only exception is the direct public-read seam below.
-- **Direct public-read seam.** `app/PublicRead/**` may use the four named
+- **Direct read seams.** `app/PublicRead/**` may use the four named
   `BaseConnection` groups (`cms_readonly`, `catalog_readonly`,
   `event_readonly`, `hub_readonly`) for SELECT-only reads. It must never use a
   Model, `model()`, or a write query; `Config\Database::$default` remains the
-  SQLite compatibility stub. This exception is local to `teatromuseo-bff` and
-  does not change the `ci4-bff-starter` template contract.
+  SQLite compatibility stub. `app/AdminRead/**` uses the same named groups only
+  for the authenticated, permission-filtered dashboard projection. These
+  exceptions are local to `teatromuseo-bff` and do not change the
+  `ci4-bff-starter` template contract.
 - **No JWT validation.** The BFF forwards the client's `Authorization`
   header to the upstream hub/domain. The upstream validates and either
   returns the response or a 401 — the BFF just relays.
@@ -219,7 +221,10 @@ different contracts:
 - `GET /api/v1/me/admin-dashboard` is the real consumer used by
   `teatromuseo-admin`. It combines Hub, CMS, Catalog and Event summaries with
   `aggregatePartial()`, so one unavailable source does not hide healthy
-  sections. Each domain summary still enforces the visitor's permissions.
+  sections. The Hub summary remains an authenticated upstream call; CMS,
+  Catalog and Event use `app/AdminRead/**` direct SELECT-only readers. The
+  readers apply the permissions obtained by Hub introspection and preserve the
+  existing source-level degradation contract.
 
 ### What ships out of the box
 
@@ -245,7 +250,7 @@ new endpoint isn't annotated under `app/Documentation/`.
 | `BFF_ALLOWED_ORIGINS` | Comma-separated CORS allow-list. Empty in production = throw. |
 | `encryption.key` | CI4 encryption key (32 bytes after `hex2bin:` decode) |
 | `hub.appCode`, `hub.apiKey` | Only needed if the BFF uses a service token for M2M calls |
-| `CMS_READONLY_DB_*`, `CATALOG_READONLY_DB_*`, `EVENT_READONLY_DB_*`, `HUB_READONLY_DB_*` | SELECT-only credentials for the isolated `app/PublicRead/**` seam |
+| `CMS_READONLY_DB_*`, `CATALOG_READONLY_DB_*`, `EVENT_READONLY_DB_*`, `HUB_READONLY_DB_*` | SELECT-only credentials for the isolated `app/PublicRead/**` and authenticated `app/AdminRead/**` seams |
 
 ## Common pitfalls
 

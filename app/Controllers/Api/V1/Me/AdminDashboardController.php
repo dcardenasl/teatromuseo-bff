@@ -30,27 +30,19 @@ final class AdminDashboardController extends BaseProxyController
         }
 
         $hubClient     = Services::hubDashboardClient();
-        $cmsClient     = Services::domainClient('cms', false);
-        $catalogClient = Services::domainClient('catalog', false);
-        $eventClient   = Services::domainClient('event', false);
+        $permissions   = $context->permissions;
+        $cmsReader     = Services::adminReadCmsDashboard();
+        $catalogReader = Services::adminReadCatalogDashboard();
+        $eventReader   = Services::adminReadEventDashboard();
 
         $partial = $this->aggregatePartialData([
             'hub' => static fn (): array => $hubClient->get(
                 '/api/v1/admin/dashboard/summary',
                 $bearer,
             ),
-            'cms' => static fn (): array => $cmsClient->get(
-                '/api/v1/cms/dashboard/summary',
-                $bearer,
-            ),
-            'catalog' => static fn (): array => $catalogClient->get(
-                '/api/v1/catalog/dashboard/summary',
-                $bearer,
-            ),
-            'event' => static fn (): array => $eventClient->get(
-                '/api/v1/events/dashboard/summary',
-                $bearer,
-            ),
+            'cms' => static fn (): array => $cmsReader->read($permissions),
+            'catalog' => static fn (): array => $catalogReader->read($permissions),
+            'event' => static fn (): array => $eventReader->read($permissions),
         ]);
 
         $sections = [];
