@@ -38,6 +38,12 @@
   helper es secuencial y fail-fast; no se introduce concurrencia mientras el
   consumidor real tenga una sola llamada upstream.
 
+- [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
+  2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
+  sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
+  mecanismo. La creación de `www.conf` y el dimensionamiento de FPM quedan
+  fuera de lo que puede decidirse desde el repositorio.
+
 - [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
   2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
   una colección sin `index_page`, preservando el shape de Web: título/intro,
@@ -240,6 +246,12 @@
   despliegue, no código.
 
 ## 🟡 Próximo
+
+- [ ] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Fijar
+  OPcache o ajustar PHP-FPM únicamente mediante el mecanismo que el proveedor
+  cPanel confirme como efectivo. No se resuelve con un Dockerfile local ni
+  con un `www.conf` que el hosting no cargue. Ver el
+  [`plan detallado`](../docs/plan/2026-08-15-plan-robustez-web-bff.md).
 
 ### El BFF resuelve la página pública completa (2026-08-14) — ver `../docs/plan/2026-08-14-plan-bff-page-resolution.md`
 
