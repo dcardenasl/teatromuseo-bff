@@ -25,6 +25,7 @@ final class PublicReadPageReader implements PageReaderInterface
     public function __construct(
         private readonly BaseConnection $db,
         private readonly BlockInstanceSerializer $blockSerializer,
+        private readonly ?FileUrlResolver $fileUrlResolver = null,
         private readonly string $fallbackLocale = self::FALLBACK_LOCALE,
     ) {
     }
@@ -89,7 +90,7 @@ final class PublicReadPageReader implements PageReaderInterface
         }
 
         $candidateBuilder = $this->db->table('cms_pages p')
-            ->select('p.id, p.parent_id, p.collection_id, p.page_type, p.published_at, p.sort_order, p.sitemap_priority, p.sitemap_changefreq, p.is_in_sitemap, p.updated_at, pt.language_id, pt.slug, pt.title, pt.excerpt, pt.meta_title, pt.meta_description, pt.canonical_url, pt.robots')
+            ->select('p.id, p.parent_id, p.collection_id, p.page_type, p.published_at, p.sort_order, p.sitemap_priority, p.sitemap_changefreq, p.is_in_sitemap, p.updated_at, pt.language_id, pt.slug, pt.title, pt.excerpt, pt.meta_title, pt.meta_description, pt.og_image_file_id, pt.og_image_url, pt.og_type, pt.canonical_url, pt.robots, pt.schema_data')
             ->join('cms_page_translations pt', 'pt.page_id = p.id')
             ->where('p.deleted_at', null)
             ->whereIn('pt.language_id', $languageIds)
@@ -147,7 +148,7 @@ final class PublicReadPageReader implements PageReaderInterface
         // complete without reopening the full public graph.
         $ancestorIds = $this->ancestorIds($pageId, $pages);
         $localizedQuery = $this->db->table('cms_page_translations')
-            ->select('page_id, language_id, slug, title, excerpt, meta_title, meta_description, canonical_url, robots, updated_at')
+            ->select('page_id, language_id, slug, title, excerpt, meta_title, meta_description, og_image_file_id, og_image_url, og_type, canonical_url, robots, schema_data, updated_at')
             ->whereIn('page_id', $ancestorIds)
             ->whereIn('language_id', $languageIds)
             ->get();
@@ -164,7 +165,9 @@ final class PublicReadPageReader implements PageReaderInterface
         if (! $preview && in_array((string) $page['page_type'], self::PAGE_TEMPLATE_TYPES, true)) {
             return $this->notFound($locale);
         }
-        $translation = $this->resolveTranslation($translations[$pageId] ?? [], $locale, $defaultLocale);
+        $translation = $this->normalizePageTranslation(
+            $this->resolveTranslation($translations[$pageId] ?? [], $locale, $defaultLocale),
+        );
         $payload = [
             'id' => $pageId,
             'parent_id' => $page['parent_id'],
@@ -179,8 +182,11 @@ final class PublicReadPageReader implements PageReaderInterface
             'excerpt' => $translation['excerpt'] ?? null,
             'meta_title' => $translation['meta_title'] ?? null,
             'meta_description' => $translation['meta_description'] ?? null,
+            'og_image' => $translation['og_image'] ?? null,
+            'og_type' => $translation['og_type'] ?? null,
             'canonical_url' => $translation['canonical_url'] ?? null,
             'robots' => $translation['robots'] ?? null,
+            'schema_data' => $translation['schema_data'] ?? null,
             'localized_slugs' => $pathMap[$pageId]['localized'] ?? [],
             'updated_at' => $page['updated_at'],
         ];
@@ -225,7 +231,7 @@ final class PublicReadPageReader implements PageReaderInterface
         [, $codeById, $defaultLocale] = $this->loadPublicLanguages();
         $languageIds = array_keys($codeById);
         $translationBuilder = $this->db->table('cms_page_translations')
-            ->select('language_id, slug, title, excerpt, meta_title, meta_description, canonical_url, robots, updated_at')
+            ->select('language_id, slug, title, excerpt, meta_title, meta_description, og_image_file_id, og_image_url, og_type, canonical_url, robots, schema_data, updated_at')
             ->where('page_id', (int) $page['id']);
         if ($languageIds !== []) {
             $translationBuilder->whereIn('language_id', $languageIds);
@@ -243,7 +249,9 @@ final class PublicReadPageReader implements PageReaderInterface
             $localizedSlugs[$language] = (string) ($translation['slug'] ?? '');
         }
 
-        $translation = $this->resolveTranslation($translations, $locale, $defaultLocale);
+        $translation = $this->normalizePageTranslation(
+            $this->resolveTranslation($translations, $locale, $defaultLocale),
+        );
         $payload = array_merge($page, $translation);
         $payload['id'] = (int) $page['id'];
         $payload['blocks'] = $this->blockSerializer->forContent('page', (int) $page['id'], $locale);
@@ -417,6 +425,24 @@ final class PublicReadPageReader implements PageReaderInterface
     private function resolveTranslation(array $translations, string $locale, string $defaultLocale): array
     {
         return $translations[$locale] ?? $translations[$defaultLocale] ?? [];
+    }
+
+    /**
+     * @param array<string, mixed> $translation
+     * @return array<string, mixed>
+     */
+    private function normalizePageTranslation(array $translation): array
+    {
+        if ($this->fileUrlResolver !== null) {
+            return $this->fileUrlResolver->normalizePageTranslation($translation);
+        }
+
+        $url = trim((string) ($translation['og_image_url'] ?? ''));
+        if ($url !== '') {
+            $translation['og_image'] = ['url' => $url];
+        }
+
+        return $translation;
     }
 
     /**

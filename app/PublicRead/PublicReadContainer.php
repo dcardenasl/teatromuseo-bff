@@ -52,7 +52,12 @@ final class PublicReadContainer
         $tags = new PublicReadTagReader($db, self::fallbackLocale());
         $forms = new PublicReadFormReader($db, self::fallbackLocale());
         $serializer = new BlockInstanceSerializer($db, $fileResolver);
-        $pages = new PublicReadPageReader($db, $serializer, self::fallbackLocale());
+        $pages = new PublicReadPageReader(
+            db: $db,
+            blockSerializer: $serializer,
+            fileUrlResolver: $fileResolver,
+            fallbackLocale: self::fallbackLocale(),
+        );
         $entries = new PublicReadEntryReader(
             $db,
             $fileResolver,
