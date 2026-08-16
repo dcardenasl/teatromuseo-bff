@@ -53,6 +53,10 @@
   helper es secuencial y fail-fast; no se introduce concurrencia mientras el
   consumidor real tenga una sola llamada upstream.
 
+- [x] **BFF-DASH-01 — Lectura JSON con bearer en `DomainClient`.** Cerrada
+  2026-08-16. Se añadió `get()` para lecturas JSON autenticadas sin alterar
+  `forward()`; verificado con test unitario de URL, bearer y envelope.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -261,6 +265,32 @@
   despliegue, no código.
 
 ## 🟡 Próximo
+
+### Dashboard de Admin como consumidor real del BFF (propuesta 2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-dashboard-via-bff.md`
+
+El patrón introspect+aggregate (`/api/v1/me/dashboard`) no tiene consumidor
+real hoy — es el "canonical aggregator example" del propio código. Este
+bloque le da uno: el dashboard de `teatromuseo-admin`, que ya hace 4 llamadas
+de dominio por su cuenta y puede delegarlas aquí. No toca `aggregate()` ni el
+endpoint de ejemplo existente — agrega una primitiva y un endpoint nuevos.
+Sin iniciar; no bloquea ni compite con el trabajo de `page-resolve`.
+
+- [ ] **BFF-DASH-02 — Configurar `BFF_DOMAINS` real** (cms/catalog/event) en
+  `.env`/`.env.example`. Hoy `Services::domainClient()` lanzaría
+  `InvalidArgumentException`. Sin dependencias.
+- [ ] **BFF-DASH-03 — `BaseProxyController::aggregatePartial()`.** Primitiva
+  nueva, secuencial, que captura el fallo de cada fuente por separado en vez
+  de abortar todo (a diferencia de `aggregate()`, que se mantiene fail-fast
+  para sus consumidores actuales). Sin dependencias.
+- [ ] **BFF-DASH-04 — `GET /api/v1/me/admin-dashboard`.** Agrega hub +
+  cms + catalog + event vía `aggregatePartial()`. Depende de
+  `BFF-DASH-01/02/03`.
+- [ ] **BFF-DASH-05 — Tests de integración**, mismo patrón que
+  `DashboardAggregatorTest.php`, cubriendo degradación parcial. Depende de
+  `BFF-DASH-04`.
+- [ ] **BFF-DASH-06 — Documentación** distinguiendo `/me/dashboard` (ejemplo)
+  de `/me/admin-dashboard` (real, consumido por `teatromuseo-admin`, ver
+  `ADM-DASH-03..06` en su `TASKS.md`). Depende de `BFF-DASH-04`.
 
 - [x] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Diferida y
   descartada el 2026-08-16 por falta de control sobre el hosting. La cuenta

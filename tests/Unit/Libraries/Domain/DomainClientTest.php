@@ -6,6 +6,7 @@ namespace Tests\Unit\Libraries\Domain;
 
 use App\Libraries\Domain\DomainClient;
 use CodeIgniter\HTTP\CURLRequest;
+use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Services;
 use InvalidArgumentException;
@@ -25,6 +26,39 @@ class DomainClientTest extends CIUnitTestCase
         $client = new DomainClient($http, 'http://catalog-domain.test', 10);
 
         $this->assertInstanceOf(DomainClient::class, $client);
+    }
+
+    public function testGetReadsJsonWithBearerToken(): void
+    {
+        $capturedMethod  = null;
+        $capturedUrl     = null;
+        $capturedOptions = null;
+        $response        = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getBody')->willReturn(json_encode([
+            'data' => ['sections' => ['pages' => ['total' => 3]]],
+        ], JSON_THROW_ON_ERROR));
+
+        $http = $this->createMock(CURLRequest::class);
+        $http->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedMethod, &$capturedUrl, &$capturedOptions, $response): ResponseInterface {
+                $capturedMethod  = $method;
+                $capturedUrl     = $url;
+                $capturedOptions = $options;
+
+                return $response;
+            });
+
+        $client = new DomainClient($http, 'http://catalog-domain.test');
+
+        $result = $client->get('/catalog/dashboard/summary', 'visitor-token');
+
+        $this->assertSame(['sections' => ['pages' => ['total' => 3]]], $result);
+        $this->assertSame('GET', $capturedMethod);
+        $this->assertSame('http://catalog-domain.test/catalog/dashboard/summary', $capturedUrl);
+        $this->assertSame('Bearer visitor-token', $capturedOptions['headers']['Authorization']);
+        $this->assertSame('application/json', $capturedOptions['headers']['Accept']);
     }
 
     public function testServicesDomainClientThrowsOnUnconfiguredDomain(): void
