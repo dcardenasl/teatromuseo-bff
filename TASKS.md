@@ -289,14 +289,13 @@
 
 ## 🟡 Próximo
 
-### Dashboard de Admin como consumidor real del BFF (propuesta 2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-dashboard-via-bff.md`
+### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 
-El patrón introspect+aggregate (`/api/v1/me/dashboard`) no tiene consumidor
-real hoy — es el "canonical aggregator example" del propio código. Este
-bloque le da uno: el dashboard de `teatromuseo-admin`, que ya hace 4 llamadas
-de dominio por su cuenta y puede delegarlas aquí. No toca `aggregate()` ni el
-endpoint de ejemplo existente — agrega una primitiva y un endpoint nuevos.
-Sin iniciar; no bloquea ni compite con el trabajo de `page-resolve`.
+El BFF ahora expone `/api/v1/me/admin-dashboard` como consumidor real del
+dashboard de `teatromuseo-admin`. Conserva `/api/v1/me/dashboard` como ejemplo
+canónico de `aggregate()` fail-fast, y la nueva ruta usa `aggregatePartial()`
+secuencial para degradar por fuente sin cambiar el contrato existente. El
+detalle está en `../docs/plan/2026-08-16-plan-admin-dashboard-via-bff.md`.
 
 - [x] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Diferida y
   descartada el 2026-08-16 por falta de control sobre el hosting. La cuenta
