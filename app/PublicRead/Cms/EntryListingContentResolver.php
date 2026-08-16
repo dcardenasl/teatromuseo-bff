@@ -28,9 +28,10 @@ final class EntryListingContentResolver
      * @param list<string> $includeKeys Subset of self::ALL_KEYS to compute and
      *   return. Empty means "no sub-selection requested" — every key is
      *   computed and returned, same as before this parameter existed. A
-     *   caller that only renders a card's image and date (e.g. collection_grid)
-     *   passes `['image', 'date_fields']` and skips the cost/payload of
-     *   rich_text, video, documents, and secondary_action entirely.
+     *   callers that only render a card's image and date can pass
+     *   `['image', 'date_fields']` and skip the cost/payload of rich_text,
+     *   video, documents, and secondary_action. The public video collection
+     *   explicitly requests `video` because its cards open a player modal.
      * @return array<int, array<string, mixed>>
      */
     public function resolveBatch(array $entries, string $langCode, array $projectionFields = [], array $includeKeys = []): array

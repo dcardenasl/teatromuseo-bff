@@ -103,7 +103,7 @@ final readonly class BlockListQueryBuilder
         }
 
         $include = match ($blockKey) {
-            'collection_grid' => 'listing_content.fields',
+            'collection_grid' => 'listing_content.fields,listing_content.video',
             'collection_timeline' => 'listing_content.publication_date,listing_content.documents',
             default => 'listing_content.image,listing_content.secondary_action,listing_content.rich_text,listing_content.video,listing_content.publication_date,listing_content.date_fields,listing_content.fields',
         };
