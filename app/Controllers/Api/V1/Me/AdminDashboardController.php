@@ -30,9 +30,9 @@ final class AdminDashboardController extends BaseProxyController
         }
 
         $hubClient     = Services::hubDashboardClient();
-        $cmsClient    = Services::domainClient('cms');
-        $catalogClient = Services::domainClient('catalog');
-        $eventClient  = Services::domainClient('event');
+        $cmsClient     = Services::domainClient('cms', false);
+        $catalogClient = Services::domainClient('catalog', false);
+        $eventClient   = Services::domainClient('event', false);
 
         $partial = $this->aggregatePartialData([
             'hub' => static fn (): array => $hubClient->get(

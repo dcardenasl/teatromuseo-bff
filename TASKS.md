@@ -67,8 +67,9 @@
 
 - [x] **BFF-DASH-04 — `GET /api/v1/me/admin-dashboard`.** Cerrada
   2026-08-16. Se añadió el agregador introspectado de Hub/CMS/Catalog/Event,
-  con rutas versionadas, estados y secciones compatibles; `php spark routes`,
-  tests HTTP y generación de OpenAPI verifican el wiring.
+  con clientes de dominio aislados por instancia para evitar contaminación del
+  cliente compartido; tests, `composer quality` y smoke HTTP autenticado real
+  devolvieron 200 con las cuatro fuentes `ok`.
 
 - [x] **BFF-DASH-05 — Tests de integración.** Cerrada 2026-08-16. Se cubren
   401 sin token, 401 por introspección inválida, cuatro fuentes sanas,
