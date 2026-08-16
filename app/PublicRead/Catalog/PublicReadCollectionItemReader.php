@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\PublicRead\Catalog;
 
 use App\PublicRead\Page\CatalogItemReaderInterface;
-use App\PublicRead\Support\FileMetaResolverInterface;
+use App\PublicRead\Support\MediaHydrator;
 use App\PublicRead\Support\PublicReadEnvelope;
+use App\PublicRead\Support\PublicReadPagination;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
@@ -39,7 +40,7 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
     /** @param BaseConnection<mixed, mixed> $db */
     public function __construct(
         private readonly BaseConnection $db,
-        private readonly FileMetaResolverInterface $fileMetaResolver,
+        private readonly MediaHydrator $mediaHydrator,
         private readonly string $fallbackLocale = 'es',
     ) {
     }
@@ -120,7 +121,7 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
         // Every supported order has an id tie-breaker, so page boundaries are
         // stable even when the primary sort value is duplicated.
         $builder->orderBy('ci.' . $sort, 'ASC')->orderBy('ci.id', 'ASC');
-        $builder->limit($request->perPage, ($request->page - 1) * $request->perPage);
+        PublicReadPagination::apply($builder, $request->page, $request->perPage);
         $result = $builder->get();
         $rows = $result !== false ? array_values($result->getResultArray()) : [];
         $data = $this->hydrate($rows, $request->locale, false, $fields);
@@ -354,7 +355,7 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
         foreach ($rows as $row) {
             $fileIds = array_merge($fileIds, $this->fileIds($row, $resolveCover, $resolveGallery));
         }
-        $media = $this->resolveMedia($fileIds);
+        $media = $this->mediaHydrator->resolve($fileIds);
 
         $result = [];
         foreach ($rows as $row) {
@@ -379,8 +380,8 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
                 'materials' => $row['materials'] ?? null,
                 'cover_file_id' => isset($row['cover_file_id']) ? (int) $row['cover_file_id'] : null,
                 'gallery_file_ids' => $row['gallery_file_ids'] ?? null,
-                'cover_image' => $this->mediaItem($media, (int) ($row['cover_file_id'] ?? 0)),
-                'gallery_images' => $this->galleryMedia($media, $row['gallery_file_ids'] ?? null),
+                'cover_image' => $this->mediaHydrator->item($media, (int) ($row['cover_file_id'] ?? 0)),
+                'gallery_images' => $this->mediaHydrator->gallery($media, $row['gallery_file_ids'] ?? null),
                 'collection_number' => $row['collection_number'] ?? null,
                 'collection_group' => $row['collection_group'] ?? null,
                 'physical_description' => $localized['physical_description'] ?? ($row['physical_description'] ?? null),
@@ -602,61 +603,6 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
         }
 
         return array_values(array_unique($ids));
-    }
-
-    /**
-     * @param list<int> $ids
-     * @return array<int, array<string, mixed>>
-     */
-    private function resolveMedia(array $ids): array
-    {
-        if ($ids === []) {
-            return [];
-        }
-
-        return $this->fileMetaResolver->resolveMany(array_values(array_unique(array_map(
-            static fn (mixed $id): int => (int) $id,
-            $ids,
-        ))));
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $media
-     * @return array<string, mixed>|null
-     */
-    private function mediaItem(array $media, int $id): ?array
-    {
-        if ($id <= 0 || ! isset($media[$id])) {
-            return null;
-        }
-
-        $meta = $media[$id];
-
-        return [
-            'source_kind' => 'hub_file',
-            'file_id' => $id,
-            'url' => $meta['url'] ?? null,
-            'variants' => is_string($meta['variants'] ?? null)
-                ? json_decode($meta['variants'], true)
-                : ($meta['variants'] ?? null),
-        ];
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $media
-     * @return list<array<string, mixed>>
-     */
-    private function galleryMedia(array $media, mixed $rawIds): array
-    {
-        $result = [];
-        foreach (explode(',', (string) $rawIds) as $rawId) {
-            $item = $this->mediaItem($media, (int) trim($rawId));
-            if ($item !== null) {
-                $result[] = $item;
-            }
-        }
-
-        return $result;
     }
 
     /**

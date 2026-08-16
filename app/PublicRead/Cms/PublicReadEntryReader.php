@@ -6,6 +6,7 @@ namespace App\PublicRead\Cms;
 
 use App\PublicRead\Page\EntryReaderInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
+use App\PublicRead\Support\PublicReadPagination;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
@@ -46,8 +47,8 @@ final class PublicReadEntryReader implements EntryReaderInterface
         $total = (int) $countBuilder->countAllResults();
         $builder->select('e.id, e.collection_id, e.author_id, e.workflow_status, e.published_at, e.scheduled_at, e.is_featured, e.view_count, e.sort_order, e.sitemap_priority, e.sitemap_changefreq, e.is_in_sitemap, e.created_at, e.updated_at');
         $this->applyOrdering($builder, $request, $languageId, $defaultLanguageId);
-        $builder->orderBy('e.id', 'ASC')
-            ->limit($request->perPage, ($request->page - 1) * $request->perPage);
+        $builder->orderBy('e.id', 'ASC');
+        PublicReadPagination::apply($builder, $request->page, $request->perPage);
         $query = $builder->get();
         $rows = $query !== false ? array_values($query->getResultArray()) : [];
         $data = $this->hydrate($rows, $request->locale, $languageId, $defaultLanguageId, $languageCodes, $fields, false, $request);

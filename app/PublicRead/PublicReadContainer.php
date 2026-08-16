@@ -22,6 +22,7 @@ use App\PublicRead\Cms\SlugRouter;
 use App\PublicRead\Cms\TranslationResolver;
 use App\PublicRead\Event\PublicReadEventReader;
 use App\PublicRead\Support\DirectDbFileMetaResolver;
+use App\PublicRead\Support\MediaHydrator;
 use CodeIgniter\Database\BaseConnection;
 
 /** Construction seam for all direct public-read dependencies. */
@@ -80,7 +81,11 @@ final class PublicReadContainer
 
     public static function catalog(): PublicReadCollectionItemReader
     {
-        return new PublicReadCollectionItemReader(self::database('catalog_readonly'), self::fileMetaResolver(), self::fallbackLocale());
+        return new PublicReadCollectionItemReader(
+            self::database('catalog_readonly'),
+            new MediaHydrator(self::fileMetaResolver()),
+            self::fallbackLocale(),
+        );
     }
 
     public static function catalogFacets(): CatalogFacetReader
@@ -92,7 +97,7 @@ final class PublicReadContainer
     {
         return new PublicReadEventReader(
             self::database('event_readonly'),
-            self::fileMetaResolver(),
+            new MediaHydrator(self::fileMetaResolver()),
             (string) env('EVENT_SCHEDULE_TIMEZONE', 'America/Santiago'),
             self::fallbackLocale(),
         );

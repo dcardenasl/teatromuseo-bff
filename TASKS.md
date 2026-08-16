@@ -26,6 +26,13 @@
   se actualizaron el container, el bundle y `PageEnvelope`. No se agregaron ni
   retiraron rutas HTTP.
 
+- [x] **BFF-ROBUST-02 — Soporte compartido de PublicRead.** Cerrada
+  2026-08-15. Se extrajeron `MediaHydrator` y `PublicReadPagination` a
+  `app/PublicRead/Support/`; Catalog, Event y CMS reutilizan las mismas
+  proyecciones, offsets y envelopes sin cambiar el contrato JSON. Verificado
+  con `composer quality`: 176 tests, 518 assertions, 2 deprecations y 1
+  skipped; PHPStan, CS-Fixer y arquitectura verdes.
+
 - [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
   2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
   una colección sin `index_page`, preservando el shape de Web: título/intro,
