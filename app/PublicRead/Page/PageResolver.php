@@ -146,10 +146,38 @@ final class PageResolver
         if ($pageType === 'cms_page') {
             $sourcePageType = (string) ($page['page_type'] ?? '');
             $page['source_page_type'] = $sourcePageType;
+            if (! array_key_exists('showPageHeading', $page)) {
+                $page['showPageHeading'] = ! $this->hasHeadingOwner($page['blocks'] ?? []);
+            }
         }
         $page['page_type'] = $pageType;
 
         return ['outcome' => 'page', 'redirect' => null, 'page' => $page, 'context' => $context];
+    }
+
+    /** @param mixed $blocks */
+    private function hasHeadingOwner(mixed $blocks): bool
+    {
+        if (! is_array($blocks)) {
+            return false;
+        }
+
+        foreach ($blocks as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+
+            $presentation = $block['presentation'] ?? null;
+            if (is_array($presentation) && ($presentation['owns_page_heading'] ?? false) === true) {
+                return true;
+            }
+
+            if ($this->hasHeadingOwner($block['children'] ?? [])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -236,17 +264,79 @@ final class PageResolver
             $localizedSlugs[$locale] = PublicPagePaths::routePath($routeKey, $locale) . '/' . $slug;
         }
 
+        $localizedUrls = [];
+        foreach ($localizedSlugs as $language => $localizedPath) {
+            $language = trim((string) $language, '/');
+            $localizedPath = trim((string) $localizedPath, '/');
+            if ($language === '' || $localizedPath === '') {
+                continue;
+            }
+            $localizedUrls[$language] = '/' . $language . '/' . $localizedPath;
+        }
+
         $page = $template;
         $page['title'] = $title;
         $page['excerpt'] = $excerpt;
         $page['meta_title'] = $title;
-        $page['meta_description'] = $excerpt;
+        $page['meta_description'] = $this->detailMetaDescription($excerpt, $template['blocks'] ?? []);
         $page['slug'] = $localizedSlugs[$locale] ?? ($localizedSlugs[array_key_first($localizedSlugs)] ?? $slug);
         $page['localized_slugs'] = $localizedSlugs;
+        $page['localized_urls'] = $localizedUrls;
         $page['canonical_url'] = '/' . $locale . '/' . ltrim($page['slug'], '/');
-        $page['robots'] = 'index, follow';
+
+        // The CMS template owns the page presentation and SEO policy, while
+        // publication timestamps belong to the domain record being rendered.
+        // This keeps Article metadata tied to the actual event/catalog item,
+        // never to the singleton template shell.
+        foreach (['created_at' => 'published_at', 'updated_at' => 'updated_at'] as $detailKey => $pageKey) {
+            $value = trim((string) ($detail[$detailKey] ?? ''));
+            if ($value !== '') {
+                $page[$pageKey] = $value;
+            }
+        }
 
         return $page;
+    }
+
+    /** @param mixed $blocks */
+    private function detailMetaDescription(string $excerpt, mixed $blocks): string
+    {
+        $maxLength = $this->seoDescriptionMaxLength($blocks);
+        if ($maxLength === null || $maxLength <= 0 || mb_strlen($excerpt) <= $maxLength) {
+            return $excerpt;
+        }
+
+        return rtrim(mb_strimwidth($excerpt, 0, $maxLength, '…', 'UTF-8'));
+    }
+
+    /** @param mixed $blocks */
+    private function seoDescriptionMaxLength(mixed $blocks): ?int
+    {
+        if (! is_array($blocks)) {
+            return null;
+        }
+
+        foreach ($blocks as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+
+            $presentation = $block['presentation'] ?? null;
+            $seo = is_array($presentation) && is_array($presentation['seo'] ?? null)
+                ? $presentation['seo']
+                : [];
+            $maxLength = filter_var($seo['description_max_length'] ?? null, FILTER_VALIDATE_INT);
+            if (is_int($maxLength) && $maxLength > 0) {
+                return $maxLength;
+            }
+
+            $nestedMaxLength = $this->seoDescriptionMaxLength($block['children'] ?? []);
+            if ($nestedMaxLength !== null) {
+                return $nestedMaxLength;
+            }
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed>|null */

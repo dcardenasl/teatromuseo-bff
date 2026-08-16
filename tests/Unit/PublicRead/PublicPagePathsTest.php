@@ -136,9 +136,23 @@ final class PublicPagePathsTest extends CIUnitTestCase
         $pages->expects(self::once())->method('byType')->with('es', 'template_event_item')->willReturn(
             new ApiResult([
                 'ok' => true,
-                'data' => [
-                    'page_type' => 'template_event_item',
-                    'blocks' => [['block_key' => 'event_item_header']],
+                    'data' => [
+                        'page_type' => 'template_event_item',
+                    'robots' => 'noindex, nofollow',
+                    'og_type' => 'article',
+                    'canonical_url' => '/template/event',
+                    'schema_data' => [
+                        '@context' => 'https://schema.org',
+                        '@type' => 'Event',
+                    ],
+                        'og_image' => ['url' => '/uploads/event-share.webp'],
+                        'blocks' => [[
+                            'block_key' => 'event_item_header',
+                            'presentation' => [
+                                'owns_page_heading' => true,
+                                'seo' => ['description_max_length' => 40],
+                            ],
+                        ]],
                 ],
             ], 200),
         );
@@ -149,7 +163,7 @@ final class PublicPagePathsTest extends CIUnitTestCase
                 'data' => [
                     'id' => 201,
                     'title' => 'Festival Uno',
-                    'description' => 'Descripción del festival uno.',
+                    'description' => 'Descripción del festival uno con una explicación suficientemente larga para comprobar el límite SEO.',
                     'slug' => 'festival-uno',
                     'slugs' => [
                         'es' => 'festival-uno',
@@ -159,8 +173,10 @@ final class PublicPagePathsTest extends CIUnitTestCase
                     ],
                     'localized' => [
                         'title' => 'Festival Uno',
-                        'description' => 'Descripción del festival uno.',
+                        'description' => 'Descripción del festival uno con una explicación suficientemente larga para comprobar el límite SEO.',
                     ],
+                    'created_at' => '2026-08-01 10:00:00',
+                    'updated_at' => '2026-08-10 12:30:00',
                 ],
             ], 200),
         );
@@ -175,7 +191,18 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame('cms_page', $result['page']['page_type']);
         self::assertSame('template_event_item', $result['page']['source_page_type']);
         self::assertSame('Festival Uno', $result['page']['title']);
+        self::assertFalse($result['page']['showPageHeading']);
+        self::assertLessThanOrEqual(40, mb_strlen((string) $result['page']['meta_description']));
         self::assertSame('/es/cartelera/festival-uno', $result['page']['canonical_url']);
+        self::assertSame('noindex, nofollow', $result['page']['robots']);
+        self::assertSame('article', $result['page']['og_type']);
+        self::assertSame(['url' => '/uploads/event-share.webp'], $result['page']['og_image']);
+        self::assertSame([
+            '@context' => 'https://schema.org',
+            '@type' => 'Event',
+        ], $result['page']['schema_data']);
+        self::assertSame('2026-08-01 10:00:00', $result['page']['published_at']);
+        self::assertSame('2026-08-10 12:30:00', $result['page']['updated_at']);
         self::assertSame([
             'es' => 'cartelera/festival-uno',
             'en' => 'programming/one-festival',
@@ -196,7 +223,10 @@ final class PublicPagePathsTest extends CIUnitTestCase
                 'ok' => true,
                 'data' => [
                     'page_type' => 'template_catalog_item',
-                    'blocks' => [['block_key' => 'catalog_item_header']],
+                    'blocks' => [[
+                        'block_key' => 'catalog_item_header',
+                        'presentation' => ['owns_page_heading' => true],
+                    ]],
                 ],
             ], 200),
         );
@@ -232,6 +262,7 @@ final class PublicPagePathsTest extends CIUnitTestCase
         self::assertSame('page', $result['outcome']);
         self::assertSame('template_catalog_item', $result['page']['source_page_type']);
         self::assertSame('Pieza localizada', $result['page']['title']);
+        self::assertFalse($result['page']['showPageHeading']);
         self::assertSame('/es/museo/coleccion/pieza-de-prueba', $result['page']['canonical_url']);
         self::assertSame([
             'es' => 'museo/coleccion/pieza-de-prueba',
