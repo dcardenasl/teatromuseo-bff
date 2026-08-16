@@ -45,8 +45,8 @@
   2026-08-15. Se extrajeron `MediaHydrator` y `PublicReadPagination` a
   `app/PublicRead/Support/`; Catalog, Event y CMS reutilizan las mismas
   proyecciones, offsets y envelopes sin cambiar el contrato JSON. Verificado
-  con `composer quality`: 176 tests, 518 assertions, 2 deprecations y 1
-  skipped; PHPStan, CS-Fixer y arquitectura verdes.
+  nuevamente el 2026-08-16 con `composer quality`: 181 tests, 535 assertions,
+  2 deprecations y 1 skipped; PHPStan, CS-Fixer y arquitectura verdes.
 
 - [x] **BFF-ROBUST-03 — Semántica de `aggregate()`.** Cerrada
   2026-08-15. Se dejó explícito en `BaseProxyController` y esta guía que el
