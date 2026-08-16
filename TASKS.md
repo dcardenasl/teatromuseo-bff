@@ -75,6 +75,10 @@
   degradación parcial y cuatro fuentes caídas; verificado con 5 tests / 25
   asserts.
 
+- [x] **BFF-DASH-06 — Documentación.** Cerrada 2026-08-16. `CLAUDE.md`
+  distingue el agregador fail-fast de referencia `/me/dashboard` del
+  consumidor real `/me/admin-dashboard` con degradación parcial.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -292,10 +296,6 @@ bloque le da uno: el dashboard de `teatromuseo-admin`, que ya hace 4 llamadas
 de dominio por su cuenta y puede delegarlas aquí. No toca `aggregate()` ni el
 endpoint de ejemplo existente — agrega una primitiva y un endpoint nuevos.
 Sin iniciar; no bloquea ni compite con el trabajo de `page-resolve`.
-
-- [ ] **BFF-DASH-06 — Documentación** distinguiendo `/me/dashboard` (ejemplo)
-  de `/me/admin-dashboard` (real, consumido por `teatromuseo-admin`, ver
-  `ADM-DASH-03..06` en su `TASKS.md`). Depende de `BFF-DASH-04`.
 
 - [x] **INFRA-ROBUST-02 — Aplicación de configuración del host.** Diferida y
   descartada el 2026-08-16 por falta de control sobre el hosting. La cuenta

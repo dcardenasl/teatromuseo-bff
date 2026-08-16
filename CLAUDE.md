@@ -104,10 +104,14 @@ Base classes live in `dcardenasl/ci4-api-core` (Packagist):
   opt-in only.
 
 `BaseProxyController::aggregate()` is currently sequential by design. The
-existing dashboard aggregator has one upstream call, so adding concurrency
-would add complexity without a current benefit. A future aggregator with two
-or more independent upstream calls must trigger an explicit concurrency
-review and preserve the existing fail-fast error semantics.
+existing canonical `/me/dashboard` aggregator has one upstream call, so
+adding concurrency would add complexity without a current benefit. The real
+Admin consumer is `/me/admin-dashboard`; it uses the separate
+`aggregatePartial()` primitive for four independent summaries and reports
+source-level degradation. Both primitives remain sequential. A future
+aggregator with two or more independent upstream calls must trigger an
+explicit concurrency review; do not change `aggregate()`'s fail-fast
+semantics to implement partial degradation.
 
 ## Adding an endpoint — three patterns
 
@@ -206,6 +210,16 @@ CI4 replaces the request with a vanilla `IncomingRequest` (not
 `ApiRequest`), so `getAuthUserId()` would not be available. The context
 holder is set by the filter regardless of which request type the framework
 hands the controller.
+
+The BFF exposes two authenticated dashboard aggregators with deliberately
+different contracts:
+
+- `GET /api/v1/me/dashboard` is the canonical fail-fast example. It combines
+  the Hub profile and token permissions and remains available for reference.
+- `GET /api/v1/me/admin-dashboard` is the real consumer used by
+  `teatromuseo-admin`. It combines Hub, CMS, Catalog and Event summaries with
+  `aggregatePartial()`, so one unavailable source does not hide healthy
+  sections. Each domain summary still enforces the visitor's permissions.
 
 ### What ships out of the box
 
