@@ -18,11 +18,26 @@ class Services extends BaseService
 {
     use ApiCoreServices;
 
-    public static function hubClient(bool $getShared = true): \App\Libraries\Hub\HubClient
+    public static function hubClient(bool $getShared = true): \dcardenasl\Ci4ApiCore\Http\Client\HubClient
     {
         if ($getShared) {
             return static::getSharedInstance('hubClient');
         }
+
+        return static::createHubClient();
+    }
+
+    public static function hubDashboardClient(bool $getShared = true): \App\Libraries\Hub\HubClient
+    {
+        if ($getShared) {
+            return static::getSharedInstance('hubDashboardClient');
+        }
+
+        return static::createHubClient();
+    }
+
+    private static function createHubClient(): \App\Libraries\Hub\HubClient
+    {
 
         /** @var \Config\Hub $hubConfig */
         $hubConfig = config('Hub');

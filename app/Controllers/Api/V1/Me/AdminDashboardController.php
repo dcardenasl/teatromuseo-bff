@@ -29,7 +29,7 @@ final class AdminDashboardController extends BaseProxyController
             throw new AuthenticationException('Missing authenticated user context.');
         }
 
-        $hubClient    = Services::hubClient();
+        $hubClient     = Services::hubDashboardClient();
         $cmsClient    = Services::domainClient('cms');
         $catalogClient = Services::domainClient('catalog');
         $eventClient  = Services::domainClient('event');
