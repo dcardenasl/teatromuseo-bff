@@ -119,6 +119,19 @@ abstract class BaseProxyController extends Controller
      */
     protected function aggregatePartial(array $calls): ResponseInterface
     {
+        return $this->response->setJSON(ApiResponse::success($this->aggregatePartialData($calls)));
+    }
+
+    /**
+     * Collect partial results for controllers that need to build a domain
+     * specific envelope while preserving the same isolation semantics as
+     * {@see aggregatePartial()}.
+     *
+     * @param array<string, callable(): array<string, mixed>> $calls
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
+     */
+    protected function aggregatePartialData(array $calls): array
+    {
         $data = [];
 
         foreach ($calls as $key => $call) {
@@ -135,7 +148,7 @@ abstract class BaseProxyController extends Controller
             }
         }
 
-        return $this->response->setJSON(ApiResponse::success($data));
+        return $data;
     }
 
     private function respondWithException(ApiException $e): ResponseInterface

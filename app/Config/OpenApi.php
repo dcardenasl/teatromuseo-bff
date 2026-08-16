@@ -14,7 +14,8 @@ use OpenApi\Attributes as OA;
  * tokens, so the security scheme below documents the wire format only.
  *
  * Tags map to the BFF's own controllers: System (health/ping/live/ready),
- * Users (proxy example, BFF-103), Me (introspect-auth aggregator, BFF-106).
+ * Users (proxy example, BFF-103), Me (introspect-auth aggregators, BFF-106 and
+ * the real Admin dashboard consumer).
  */
 #[OA\OpenApi(
     openapi: '3.0.0',

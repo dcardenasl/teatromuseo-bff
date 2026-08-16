@@ -65,6 +65,11 @@
   la primitiva secuencial con estado por fuente, aislando fallos sin cambiar
   el contrato fail-fast de `aggregate()`; verificado con 3 tests / 10 asserts.
 
+- [x] **BFF-DASH-04 — `GET /api/v1/me/admin-dashboard`.** Cerrada
+  2026-08-16. Se añadió el agregador introspectado de Hub/CMS/Catalog/Event,
+  con rutas versionadas, estados y secciones compatibles; `php spark routes`,
+  tests HTTP y generación de OpenAPI verifican el wiring.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -283,9 +288,6 @@ de dominio por su cuenta y puede delegarlas aquí. No toca `aggregate()` ni el
 endpoint de ejemplo existente — agrega una primitiva y un endpoint nuevos.
 Sin iniciar; no bloquea ni compite con el trabajo de `page-resolve`.
 
-- [ ] **BFF-DASH-04 — `GET /api/v1/me/admin-dashboard`.** Agrega hub +
-  cms + catalog + event vía `aggregatePartial()`. Depende de
-  `BFF-DASH-01/02/03`.
 - [ ] **BFF-DASH-05 — Tests de integración**, mismo patrón que
   `DashboardAggregatorTest.php`, cubriendo degradación parcial. Depende de
   `BFF-DASH-04`.

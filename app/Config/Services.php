@@ -18,7 +18,7 @@ class Services extends BaseService
 {
     use ApiCoreServices;
 
-    public static function hubClient(bool $getShared = true): \dcardenasl\Ci4ApiCore\Http\Client\HubClient
+    public static function hubClient(bool $getShared = true): \App\Libraries\Hub\HubClient
     {
         if ($getShared) {
             return static::getSharedInstance('hubClient');
@@ -38,7 +38,7 @@ class Services extends BaseService
             httpTimeout: $hubConfig->httpTimeout ?? 5,
         );
 
-        return new \dcardenasl\Ci4ApiCore\Http\Client\HubClient(
+        return new \App\Libraries\Hub\HubClient(
             $coreHubConfig,
             \Config\Services::curlrequest(),
             \Config\Services::cache()

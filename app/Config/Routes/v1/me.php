@@ -9,3 +9,9 @@ $routes->get(
     '\App\Controllers\Api\V1\Me\DashboardController::index',
     ['filter' => 'introspectauth'],
 );
+
+$routes->get(
+    'me/admin-dashboard',
+    '\App\Controllers\Api\V1\Me\AdminDashboardController::index',
+    ['filter' => 'introspectauth'],
+);
