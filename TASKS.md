@@ -33,6 +33,11 @@
   con `composer quality`: 176 tests, 518 assertions, 2 deprecations y 1
   skipped; PHPStan, CS-Fixer y arquitectura verdes.
 
+- [x] **BFF-ROBUST-03 — Semántica de `aggregate()`.** Cerrada
+  2026-08-15. Se dejó explícito en `BaseProxyController` y esta guía que el
+  helper es secuencial y fail-fast; no se introduce concurrencia mientras el
+  consumidor real tenga una sola llamada upstream.
+
 - [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
   2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
   una colección sin `index_page`, preservando el shape de Web: título/intro,

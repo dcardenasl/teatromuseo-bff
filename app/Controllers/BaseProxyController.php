@@ -75,7 +75,10 @@ abstract class BaseProxyController extends Controller
      * results under their key into a single success envelope. The first call
      * that throws an {@see ApiException} aborts the rest and is rendered as
      * the response — this matches the fail-fast semantics the kit already
-     * uses for hub/domain errors.
+     * uses for hub/domain errors. This primitive is intentionally sequential:
+     * adding a second independent upstream call requires an explicit
+     * concurrency review instead of assuming that `aggregate()` fans out in
+     * parallel.
      *
      * @param array<string, callable(): array<string, mixed>> $calls
      */

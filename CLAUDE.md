@@ -90,6 +90,12 @@ Base classes live in `dcardenasl/ci4-api-core` (Packagist):
   Backend validates; BFF forwards. `IntrospectAuthFilter` is route-level
   opt-in only.
 
+`BaseProxyController::aggregate()` is currently sequential by design. The
+existing dashboard aggregator has one upstream call, so adding concurrency
+would add complexity without a current benefit. A future aggregator with two
+or more independent upstream calls must trigger an explicit concurrency
+review and preserve the existing fail-fast error semantics.
+
 ## Adding an endpoint — three patterns
 
 The BFF ships three composable patterns. Pick the one that matches the
