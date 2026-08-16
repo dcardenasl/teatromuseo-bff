@@ -7,13 +7,13 @@ namespace App\PublicRead;
 use App\PublicRead\Catalog\PublicReadCollectionItemReader;
 use App\PublicRead\Cms\BlockInstanceSerializer;
 use App\PublicRead\Cms\FileUrlResolver;
+use App\PublicRead\Cms\LayoutCompositionReader;
+use App\PublicRead\Cms\PageBootstrapCompositionReader;
 use App\PublicRead\Cms\PublicReadCategoryReader;
 use App\PublicRead\Cms\PublicReadCollectionReader;
 use App\PublicRead\Cms\PublicReadEntryReader;
 use App\PublicRead\Cms\PublicReadFormReader;
-use App\PublicRead\Cms\PublicReadLayoutReader;
 use App\PublicRead\Cms\PublicReadNavigationReader;
-use App\PublicRead\Cms\PublicReadPageBootstrapReader;
 use App\PublicRead\Cms\PublicReadPageReader;
 use App\PublicRead\Cms\PublicReadSettingsReader;
 use App\PublicRead\Cms\PublicReadTagReader;
@@ -72,8 +72,8 @@ final class PublicReadContainer
             forms: $forms,
             entries: $entries,
             pages: $pages,
-            pageBootstrap: new PublicReadPageBootstrapReader($redirects, $pages),
-            layout: new PublicReadLayoutReader($navigation, $settings, $collections),
+            pageBootstrap: new PageBootstrapCompositionReader($redirects, $pages),
+            layout: new LayoutCompositionReader($navigation, $settings, $collections),
             redirects: $redirects,
         );
     }

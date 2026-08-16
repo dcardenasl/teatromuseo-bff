@@ -14,8 +14,17 @@
 > Las comprobaciones de `layout` y `page-bootstrap` registradas antes de
 > BFF-PAGE-09 son evidencia histórica; el contrato HTTP vigente de página
 > completa es `page-resolve`.
+>
+> El saneamiento posterior al corte BFF-only se gestiona en
+> [`../docs/plan/2026-08-15-plan-robustez-web-bff.md`](../docs/plan/2026-08-15-plan-robustez-web-bff.md).
 
 ## ✅ Completadas
+
+- [x] **BFF-ROBUST-01 — Nombres de composición interna.** Cerrada
+  2026-08-15. `PublicReadLayoutReader` y `PublicReadPageBootstrapReader` se
+  renombraron a `LayoutCompositionReader` y `PageBootstrapCompositionReader`;
+  se actualizaron el container, el bundle y `PageEnvelope`. No se agregaron ni
+  retiraron rutas HTTP.
 
 - [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
   2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
@@ -227,13 +236,13 @@ compone routing + layout + bloques de una página en una sola respuesta, para
 que `teatromuseo-web` haga una sola llamada HTTP por página en vez de hasta 2
 en paralelo. Enmienda ADR-004 §6 una tercera vez vía ADR-008
 (`../docs/adr/008-bff-full-page-resolution.md`). Reutiliza tal cual los
-lectores ya construidos (`PublicReadLayoutReader`, `PublicReadPageBootstrapReader`,
+lectores ya construidos (`LayoutCompositionReader`, `PageBootstrapCompositionReader`,
 lectores de Catalog/Event, `DirectDbFileMetaResolver`) — no los reescribe.
 
 - [x] **BFF-PAGE-09 — Fase 3: retiro del HTTP público de `layout`/
   `page-bootstrap`.** Cerrada 2026-08-15 después del gate de estabilidad de
   Web. Se retiraron ambas rutas y el controlador ya no las expone; los
-  lectores `PublicReadLayoutReader` y `PublicReadPageBootstrapReader` se
+  lectores `LayoutCompositionReader` y `PageBootstrapCompositionReader` se
   conservan únicamente como colaboradores internos de `PageResolver`. El
   contrato público único de composición es ahora `page-resolve`. Verificado
   con quality completo y smoke posterior al despliegue: endpoints retirados

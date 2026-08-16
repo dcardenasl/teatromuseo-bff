@@ -7,8 +7,8 @@ namespace App\PublicRead\Cms;
 use App\PublicRead\Support\PublicReadEnvelope;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
-/** Composes CMS-only layout reads without invoking CRUD services. */
-final class PublicReadLayoutReader
+/** Composes the internal CMS layout used by the full-page resolver. */
+final class LayoutCompositionReader
 {
     public function __construct(
         private readonly PublicReadNavigationReader $navigationReader,

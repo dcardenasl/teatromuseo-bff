@@ -8,8 +8,8 @@ use App\PublicRead\Support\PublicReadEnvelope;
 use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
-/** Pure CMS page/redirect bootstrap used by direct BFF reads. */
-final class PublicReadPageBootstrapReader
+/** Composes the internal CMS page/redirect bootstrap for page resolution. */
+final class PageBootstrapCompositionReader
 {
     public function __construct(
         private readonly PublicRedirectResolver $redirectResolver,

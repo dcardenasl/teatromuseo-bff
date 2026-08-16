@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Page;
 
-use App\PublicRead\Cms\PublicReadLayoutReader;
+use App\PublicRead\Cms\LayoutCompositionReader;
 use DateTimeImmutable;
 use DateTimeZone;
 use Throwable;
@@ -14,7 +14,7 @@ final readonly class PageEnvelope
 {
     public function __construct(
         private PageResolver $resolver,
-        private PublicReadLayoutReader $layout,
+        private LayoutCompositionReader $layout,
         private BlockTreeResolver $blocks,
     ) {
     }

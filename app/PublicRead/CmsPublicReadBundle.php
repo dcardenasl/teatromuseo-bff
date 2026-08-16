@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\PublicRead;
 
+use App\PublicRead\Cms\LayoutCompositionReader;
+use App\PublicRead\Cms\PageBootstrapCompositionReader;
 use App\PublicRead\Cms\PublicReadCategoryReader;
 use App\PublicRead\Cms\PublicReadCollectionReader;
 use App\PublicRead\Cms\PublicReadEntryReader;
 use App\PublicRead\Cms\PublicReadFormReader;
-use App\PublicRead\Cms\PublicReadLayoutReader;
 use App\PublicRead\Cms\PublicReadNavigationReader;
-use App\PublicRead\Cms\PublicReadPageBootstrapReader;
 use App\PublicRead\Cms\PublicReadPageReader;
 use App\PublicRead\Cms\PublicReadSettingsReader;
 use App\PublicRead\Cms\PublicReadTagReader;
@@ -31,8 +31,8 @@ final readonly class CmsPublicReadBundle
         public PublicReadFormReader $forms,
         public PublicReadEntryReader $entries,
         public PublicReadPageReader $pages,
-        public PublicReadPageBootstrapReader $pageBootstrap,
-        public PublicReadLayoutReader $layout,
+        public PageBootstrapCompositionReader $pageBootstrap,
+        public LayoutCompositionReader $layout,
         public PublicRedirectResolver $redirects,
     ) {
     }
