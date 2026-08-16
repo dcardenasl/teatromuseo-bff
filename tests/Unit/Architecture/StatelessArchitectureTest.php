@@ -48,11 +48,12 @@ final class StatelessArchitectureTest extends CIUnitTestCase
                 continue;
             }
 
-            // Direct cross-database public reads are deliberately isolated in
-            // this seam. Models and model() remain forbidden everywhere,
+            // Direct cross-database reads are deliberately isolated in these
+            // seams. Models and model() remain forbidden everywhere,
             // including here; only named read-only connection plumbing is
-            // allowed under app/PublicRead.
-            $readDatabaseSeam = str_starts_with($relative, 'app/PublicRead/');
+            // allowed under app/PublicRead and app/AdminRead.
+            $readDatabaseSeam = str_starts_with($relative, 'app/PublicRead/')
+                || str_starts_with($relative, 'app/AdminRead/');
 
             $source = file_get_contents($path);
             if (!is_string($source) || $source === '') {
@@ -87,7 +88,7 @@ final class StatelessArchitectureTest extends CIUnitTestCase
             [],
             $violations,
             "Stateless architecture violations found in teatromuseo-bff:\n- " . implode("\n- ", $violations) . "\n\n" .
-            "The BFF must remain model-free; direct reads are permitted only through the isolated app/PublicRead read-only seam."
+            "The BFF must remain model-free; direct reads are permitted only through the isolated app/PublicRead and app/AdminRead read-only seams."
         );
     }
 }

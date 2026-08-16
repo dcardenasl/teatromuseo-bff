@@ -139,6 +139,33 @@ class Services extends BaseService
         return new \App\PublicRead\ReadDatabaseHealth();
     }
 
+    public static function adminReadCmsDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsDashboard();
+    }
+
+    public static function adminReadCatalogDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogDashboard();
+    }
+
+    public static function adminReadEventDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventDashboard();
+    }
+
     public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
     {
         if ($getShared) {

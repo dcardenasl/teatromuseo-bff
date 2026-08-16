@@ -7,9 +7,9 @@ namespace Config;
 use CodeIgniter\Database\Config;
 
 /**
- * Database stub.
+ * Database configuration.
  *
- * The BFF is stateless — it owns no database connection of its own.
+ * The BFF owns no writable database connection of its own.
  * This class exists only because the CI4 framework (specifically the
  * debug toolbar's Database collector) loads `Config\Database` during
  * bootstrap. The default group points at a no-op SQLite memory database
@@ -21,8 +21,8 @@ class Database extends Config
 {
     /**
      * The default database connection. It intentionally remains the in-memory
-     * SQLite compatibility group; all read-only production connections are
-     * explicit named groups below and are consumed only by app/PublicRead.
+     * SQLite compatibility group; all production connections are explicit
+     * named read-only groups consumed only by app/PublicRead and app/AdminRead.
      */
     public string $defaultGroup = 'default';
 
