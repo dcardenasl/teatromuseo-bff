@@ -411,12 +411,16 @@ comenzar su mitad (`ADM-BFF-05/06`).
   las pruebas unitarias cubren permiso, contexto y cache.
 
 - [x] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
-  Cerrada 2026-08-17. El endpoint usa `introspectauth` por ser una lectura
-  exclusiva del Event domain, publica estado `event:ok`, distingue catálogo
-  vacío de fuente caída y cubre 401/403/422/503; `php spark routes` y
-  `composer quality` quedaron verdes (225 tests, 740 assertions, 1 skipped,
-  2 deprecations). El smoke HTTP con bearer se intentó contra
-  `localhost:8188`, pero el entorno no tenía el proceso local accesible.
+  Cerrada 2026-08-17. El endpoint usa `effectivepermissionsauth` porque el
+  BFF cruza el límite de aplicación para leer el alcance Event del usuario;
+  `introspectauth` devolvía solo el scope propio de la aplicación BFF y
+  provocaba `403 event.events.read` aunque el JWT tuviera ese permiso.
+  Publica estado `event:ok`, distingue catálogo vacío de fuente caída y cubre
+  401/403/422/503. Tras reiniciar el servidor, el smoke real con superadmin
+  devolvió `200/source=ok` en los cinco contextos; los catálogos actuales
+  contienen eventos/ocurrencias y los catálogos de reservas/tipos están
+  vacíos de forma válida. `php spark routes`, tests focales y quality quedan
+  verdes.
 
 **Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
 

@@ -31,5 +31,5 @@ $routes->get(
 $routes->get(
     'me/admin-event-lookups/(:segment)',
     '\App\Controllers\Api\V1\Me\AdminEventLookupsController::index/$1',
-    ['filter' => 'introspectauth'],
+    ['filter' => 'effectivepermissionsauth'],
 );

@@ -31,7 +31,7 @@ final class AdminEventLookupsTest extends ApiTestCase
 
     public function testReturnsEmptySuccessfulCatalogDistinctFromUnavailable(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $source = $this->createMock(AdminEventLookupSourceInterface::class);
         $source->expects($this->once())
             ->method('read')
@@ -54,7 +54,7 @@ final class AdminEventLookupsTest extends ApiTestCase
 
     public function testRejectsUnknownContextBeforeReadingSource(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $source = $this->createMock(AdminEventLookupSourceInterface::class);
         $source->expects($this->never())->method('read');
         Services::injectMock('adminReadEventLookups', $source);
@@ -68,7 +68,7 @@ final class AdminEventLookupsTest extends ApiTestCase
 
     public function testReturns403WhenEventPermissionIsMissing(): void
     {
-        $this->mockHubIntrospection(['event.events.read']);
+        $this->mockEffectiveUser(['event.events.read']);
         $source = $this->createMock(AdminEventLookupSourceInterface::class);
         $source->expects($this->once())
             ->method('read')
@@ -85,7 +85,7 @@ final class AdminEventLookupsTest extends ApiTestCase
 
     public function testReturns503WhenEventSourceFails(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $source = $this->createMock(AdminEventLookupSourceInterface::class);
         $source->method('read')->willThrowException(new RuntimeException('event database unavailable'));
         Services::injectMock('adminReadEventLookups', $source);
@@ -99,19 +99,19 @@ final class AdminEventLookupsTest extends ApiTestCase
     }
 
     /** @param list<string>|null $permissions */
-    private function mockHubIntrospection(?array $permissions = null): void
+    private function mockEffectiveUser(?array $permissions = null): void
     {
         $response = $this->jsonResponse(200, [
-            'valid'       => true,
-            'uid'         => 42,
-            'permissions' => $permissions ?? ['event.events.read', 'event.venues.read'],
-            'exp'         => time() + 3600,
+            'data' => [
+                'id'          => 42,
+                'permissions' => $permissions ?? ['event.events.read', 'event.venues.read'],
+            ],
         ]);
         $http = $this->createMock(CURLRequest::class);
         $http->method('request')->willReturn($response);
 
         Services::injectMock('curlrequest', $http);
-        Services::resetSingle('hubClient');
+        Services::resetSingle('hubDashboardClient');
     }
 
     /** @return array<string, mixed> */
