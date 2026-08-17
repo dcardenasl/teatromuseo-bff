@@ -111,6 +111,23 @@ Base classes live in `dcardenasl/ci4-api-core` (Packagist):
   Backend validates; BFF forwards. Both auth-context filters are route-level
   opt-in only.
 
+### Fundamental query rule
+
+The BFF is valuable because it moves read work into the database engine, not
+because it moves a collection of small queries into another PHP process.
+For every projection, use SQL first: a bounded `SELECT` with `JOIN`s,
+conditional aggregates, `WHERE`, `GROUP BY`, `ORDER BY` and database-side
+limits whenever the required data belongs to one database. Avoid multiple
+queries whose rows are later joined, counted, grouped, sorted or filtered in
+PHP, and never load an unbounded result set to calculate a dashboard metric.
+
+For projections spanning independent databases, a cross-database `JOIN` may
+not be available. In that case each source must still return one bounded,
+permission-aware SQL projection; PHP may only merge the already-computed source
+sections into the response envelope. A separate query or PHP-side computation
+requires an explicit documented justification, a hard bound and coverage that
+guards its performance characteristics.
+
 `BaseProxyController::aggregate()` is currently sequential by design. The
 existing canonical `/me/dashboard` aggregator has one upstream call, so
 adding concurrency would add complexity without a current benefit. The real

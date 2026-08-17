@@ -20,6 +20,24 @@ forwards requests to the Hub (`8180`) or configured domain apps.
   `ContextHolder`.
 - `HubClient` is the only class that calls Hub URLs directly.
 
+## Fundamental query rule
+
+The BFF's value is efficient data access. When a projection reads related data
+from the same database, prefer one bounded SQL projection using `JOIN`,
+conditional aggregation, filtering, grouping and ordering in the database
+engine. Do not replace that work with multiple queries followed by counting,
+grouping, joining, sorting or filtering in PHP.
+
+PHP in the BFF should handle transport, authorization context, bounded response
+shaping and source-level fallback only. It must not become the query engine or
+materialize large result sets merely to calculate a projection the database can
+produce more efficiently.
+
+When sources live in separate databases and a cross-database `JOIN` is not
+available, use one bounded, SQL-first projection per source and perform only
+minimal envelope composition in PHP. Any deviation requires a documented
+reason, bounded limits and a test that protects the query shape and cost.
+
 Read this repository's `CLAUDE.md` and `TASKS.md` before editing. Check the
 repository status first and keep unrelated work intact.
 

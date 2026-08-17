@@ -24,6 +24,11 @@ write data, migrations, models, sessions or user identity.
   the caller explicitly requests the complete slug map.
 - The BFF never performs a write query or hides an upstream 4xx/404 behind
   stale data.
+- The BFF is SQL-first: related data in one database is projected with bounded
+  database-side `JOIN`s and aggregates; PHP does not replace joins, counts,
+  grouping, sorting or filtering with multiple queries and in-memory work.
+  Cross-database projections use one bounded SQL projection per source and
+  minimal envelope composition only.
 - Changes to public route segments or aliases update Web and BFF together and
   must pass the cross-repository route-contract check.
 

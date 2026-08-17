@@ -26,6 +26,26 @@ should not own:
    the hub (cached) so aggregator endpoints can personalize their responses
    without the hub knowing about the BFF's shape.
 
+## Fundamental query rule: SQL first
+
+The BFF's performance value is not merely reducing the number of client HTTP
+requests. Its read projections must give the database engine the work it is
+designed to do. When related data belongs to one database, prefer one bounded
+SQL projection with `JOIN`s, conditional aggregation, filtering, grouping,
+ordering and limits. Do not issue several queries and reconstruct the result
+with loops, in-memory joins, counts, grouping or sorting in PHP.
+
+PHP should be limited to transport, authenticated context, response envelopes
+and source-level fallback. It must not materialize large datasets to calculate
+metrics or relationships that SQL can calculate more efficiently.
+
+The platform has independent CMS, Catalog, Event and Hub databases, so a single
+cross-database `JOIN` is not always technically available. In that case the
+BFF uses one bounded, permission-aware SQL projection per database and performs
+only minimal composition of the completed source sections. Any additional
+query or PHP-side computation must have a documented reason, hard bounds and
+performance coverage.
+
 ---
 
 ## What the BFF is NOT
