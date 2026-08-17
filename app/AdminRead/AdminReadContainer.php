@@ -10,6 +10,7 @@ use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
 use App\AdminRead\Cms\CmsTranslationsDashboardSource;
 use App\AdminRead\Event\EventDashboardSource;
+use App\AdminRead\Files\AdminFileUsageSource;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -57,5 +58,13 @@ final class AdminReadContainer
     public static function eventDashboard(): EventDashboardSource
     {
         return new EventDashboardSource(self::database('event_readonly'));
+    }
+
+    public static function fileUsages(): AdminFileUsageSource
+    {
+        return new AdminFileUsageSource(
+            \Config\Services::hubDashboardClient(),
+            self::database('cms_readonly'),
+        );
     }
 }

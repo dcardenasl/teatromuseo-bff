@@ -127,7 +127,7 @@ abstract class BaseProxyController extends Controller
      * specific envelope while preserving the same isolation semantics as
      * {@see aggregatePartial()}.
      *
-     * @param array<string, callable(): array<string, mixed>> $calls
+     * @param array<string, callable(): array<array-key, mixed>> $calls
      * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
      */
     protected function aggregatePartialData(array $calls): array

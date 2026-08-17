@@ -21,3 +21,9 @@ $routes->get(
     '\App\Controllers\Api\V1\Me\AdminAnalyticsController::index',
     ['filter' => 'introspectauth'],
 );
+
+$routes->get(
+    'me/admin-files/(:num)/usages',
+    '\App\Controllers\Api\V1\Me\AdminFileUsagesController::index/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);

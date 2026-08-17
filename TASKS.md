@@ -354,13 +354,30 @@
   `composer quality` (211 tests, 683 assertions; PHPStan, CS-Fixer y
   arquitectura verdes; 2 deprecations y 1 skip informativos).
 
-## 🔴 En progreso
+- [x] **BFF-ADMINREAD-09 — Verificar el alcance real antes de codificar.**
+  Cerrada 2026-08-17. Se confirmó en código que el Hub agrega
+  `cms`/`catalog`/`event` mediante `internal/files/{id}/usage`, normalizando
+  las filas a cinco campos y descartando `context`; el CMS conserva ese
+  contexto para `block_instance`. También se confirmó que el Admin hacía una
+  segunda llamada CMS y `array_merge()` sin deduplicar. El diseño ejecutable
+  queda documentado en §13 del plan: merge por
+  `(source, resource, resource_id, role)`, preferencia de la variante con
+  `context` y `complete=false` ante cualquier fuente caída.
 
-- [ ] **BFF-ADMINREAD-09 — Verificar el alcance real antes de codificar.**
-  Confirmar en código que `DomainFileUsageClient::collectUsages()` del Hub
-  sigue agregando `cms`/`catalog`/`event` vía `internal/files/{id}/usage`, y
-  documentar qué campos de la respuesta directa de CMS (`context` en filas
-  `block_instance`) pierde ese mapeo genérico.
+- [x] **BFF-ADMINREAD-10 — `AdminFileUsageSource`.** Cerrada 2026-08-17.
+  Se implementó el lector Hub autenticado + CMS `SELECT`-only, con permisos
+  antes de consultar, proyección explícita, dedupe estable por
+  `(source, resource, resource_id, role)` y preferencia por `context`; cero
+  filas solo después de consultas exitosas, sin stale silencioso. Verificado
+  con tests SQLite y `composer quality`.
+
+- [x] **BFF-ADMINREAD-11 — `GET /api/v1/me/admin-files/{fileId}/usages`.**
+  Cerrada 2026-08-17. El endpoint usa `effectivepermissionsauth` porque cruza
+  Hub y CMS, conserva solo las fuentes consultadas, entrega `complete` y
+  `source.state`, y nunca presenta un resultado parcial como completo. Tests
+  de contrato, vacío, dedupe y fuente caída; `php spark routes` y
+  `composer quality` verdes (218 tests, 714 assertions; 2 deprecations y 1
+  skip informativos).
 
 ## 🟡 Próximo
 
@@ -384,27 +401,15 @@ del BFF de la misma feature esté cerrada, igual que en `BFF-DASH`/
 
 **Feature 3 — Usos de archivos cross-domain**
 
-El detalle ejecutable de esta feature comienza en `BFF-ADMINREAD-09`, que ya
-está en progreso arriba y debe cerrarse antes del lector.
-- [ ] **BFF-ADMINREAD-10 — `AdminFileUsageSource`.** Hub autenticado + CMS
-  `SELECT`-only, deduplicado de forma estable por
-  `(source, resource, resource_id, role)` prefiriendo la variante con
-  `context`; sin stale silencioso (un fallo debe impedir presentar el
-  resultado como completo, porque alimenta decisiones de borrado).
-- [ ] **BFF-ADMINREAD-11 — `GET /api/v1/me/admin-files/{fileId}/usages`.**
-  Controlador dedicado (no reutiliza el agregador del dashboard); tests de
-  archivo con usos reales, archivo sin usos y fuente caída; `composer
-  quality`.
+El lector y endpoint de esta feature están cerrados arriba; el Admin puede
+comenzar su mitad (`ADM-BFF-05/06`).
 
 **Feature 4 — Lookups administrativos de Event**
-
 - [ ] **BFF-ADMINREAD-12 — `EventAdminLookupSource`.** Un método/adapter por
-  contexto (`occurrence`, `ticket_type`, `ticket`, `booking`,
-  `event_reference`) según la tabla verificada `context → fuentes` del plan;
-  columnas mínimas para etiquetas de formulario; permisos por recurso
-  aplicados antes de consultar; límite documentado por catálogo (hoy 100 en
-  Admin, no ampliar sin medir); cache corto por contexto + scope de
-  permisos.
+  contexto, permisos antes de consultar, límite 100 y cache corto por
+  contexto + scope de permisos. Mover a `🔴 En progreso` después de cerrar
+  `ADM-BFF-05/06`.
+
 - [ ] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
   Enum cerrado de `context`; tests de contexto inválido, permiso, catálogo
   vacío (distinto de fuente no disponible) y fuente caída; `composer
