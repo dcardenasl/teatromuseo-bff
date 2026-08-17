@@ -51,7 +51,7 @@ final class AdminReadContainer
 
     public static function cmsTranslationsDashboard(): CmsTranslationsDashboardSource
     {
-        return new CmsTranslationsDashboardSource(\Config\Services::domainClient('cms'));
+        return new CmsTranslationsDashboardSource(self::database('cms_readonly'));
     }
 
     public static function catalogDashboard(): CatalogDashboardSource
