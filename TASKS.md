@@ -35,6 +35,31 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-ADMINREAD-05 — Lector de analytics + adaptación de traducciones.**
+  Cerrada 2026-08-17. Se añadió `CmsAnalyticsDashboardSource` con consultas
+  `SELECT` explícitas y ventana fija de 7 días, más un adapter BFF→CMS para
+  reutilizar el auditor de traducciones con `cms.languages.read`; ambos
+  quedan detrás de factories `AdminRead` y sin duplicar la lógica del CMS.
+  Verificado con `composer quality` (201 tests, 631 assertions; PHPStan,
+  CS-Fixer y arquitectura verdes).
+
+- [x] **BFF-ADMINREAD-06 — Extender `/me/admin-dashboard`.** Cerrada
+  2026-08-17. El contrato ahora entrega `analytics` y `translations` como
+  fuentes independientes, conserva `sections/source.state` y usa
+  `effectivepermissionsauth` porque la proyección cruza Hub/CMS/Catalog/Event;
+  `translations` mantiene la llamada autenticada al CMS. Verificado con
+  202 tests / 650 assertions, degradación parcial independiente, OpenAPI,
+  `php spark routes` y `composer quality` verdes. El smoke HTTP externo se
+  intentó con el stack local, pero este entorno aislado no permite conectar al
+  proceso PHP local.
+
+- [x] **BFF-ADMINREAD-07 — `CmsAnalyticsSource` completa.** Cerrada
+  2026-08-17. Se añadió la proyección completa de overview, top pages,
+  referrers, devices y timeseries con periodos cerrados, límites server-side,
+  porcentajes y ceros solo tras consultas exitosas. El filtro temporal usa el
+  índice `page_views.created_at` ya definido por CMS; no se añadió migración al
+  BFF. Verificado con `composer quality` (205 tests, 659 assertions).
+
 - [x] **WEB-BFF-NAV-01 — Contrato de destinos opcionales del menú.** Cerrada
   2026-08-16. `PageEnvelope` delega la resolución a
   `PublicMenuUrlResolver`, publica `custom_url: null` e `is_clickable: false`
@@ -319,9 +344,23 @@
   `200`; los secretos y credenciales concretos siguen siendo configuración de
   despliegue, no código.
 
+- [x] **BFF-ADMINREAD-08 — `GET /api/v1/me/admin-analytics`.** Cerrada
+  2026-08-17. Se añadió la proyección completa CMS en una sola lectura,
+  con períodos cerrados, límites server-side, validación de
+  `cms.analytics.read`, contrato OpenAPI y respuestas sanitizadas para
+  `403/422/503`. Se eligió `introspectauth` porque la seam consulta una sola
+  aplicación (CMS) y no necesita permisos efectivos cross-app. Verificado
+  con tests de payload/período/permiso/fuente caída, `php spark routes` y
+  `composer quality` (211 tests, 683 assertions; PHPStan, CS-Fixer y
+  arquitectura verdes; 2 deprecations y 1 skip informativos).
+
 ## 🔴 En progreso
 
-_(sin tareas en curso)_
+- [ ] **BFF-ADMINREAD-09 — Verificar el alcance real antes de codificar.**
+  Confirmar en código que `DomainFileUsageClient::collectUsages()` del Hub
+  sigue agregando `cms`/`catalog`/`event` vía `internal/files/{id}/usage`, y
+  documentar qué campos de la respuesta directa de CMS (`context` en filas
+  `block_instance`) pierde ese mapeo genérico.
 
 ## 🟡 Próximo
 
@@ -340,40 +379,13 @@ del BFF de la misma feature esté cerrada, igual que en `BFF-DASH`/
 
 **Feature 1 — Dashboard: widgets de analytics y traducciones completos**
 
-- [ ] **BFF-ADMINREAD-05 — Lector de analytics + adaptación de traducciones.**
-  `CmsAnalyticsDashboardSource` bajo `app/AdminRead/Cms/` con proyección
-  acotada a 7 días sobre `page_views`; para `translations`, una única
-  llamada BFF→CMS que reutiliza el algoritmo existente de auditoría (no se
-  porta ese algoritmo al BFF). Valida `cms.analytics.read`/
-  `cms.languages.read` antes de consultar.
-- [ ] **BFF-ADMINREAD-06 — Extender `/me/admin-dashboard`.** Nuevas
-  secciones versionadas `analytics`/`translations` con estado de fuente
-  independiente, sin perder el contrato `sections/source.state` existente;
-  tests de contrato, permiso y degradación parcial; `composer quality`,
-  `php spark routes`, smoke HTTP autenticado.
 
 **Feature 2 — Analytics administrativo compuesto**
 
-- [ ] **BFF-ADMINREAD-07 — `CmsAnalyticsSource` completa.** Overview, pages,
-  referrers, devices, timeseries en una sola proyección; enum cerrado de
-  `period` (`1h|24h|7d|30d`), límites fijos server-side (no enviados por el
-  cliente); `EXPLAIN` sobre volumen representativo antes de decidir si hace
-  falta un índice nuevo (la migración, si hiciera falta, es de
-  `teatromuseo-cms-domain`, no del BFF).
-- [ ] **BFF-ADMINREAD-08 — `GET /api/v1/me/admin-analytics`.** Controlador +
-  ruta; tests de paridad de payload contra el contrato actual de
-  `AnalyticsApiService`, permiso, periodo inválido y fuente caída;
-  `composer quality`.
-
 **Feature 3 — Usos de archivos cross-domain**
 
-- [ ] **BFF-ADMINREAD-09 — Verificar el alcance real antes de codificar.**
-  Confirmar en código que `DomainFileUsageClient::collectUsages()` del Hub
-  sigue agregando `cms`/`catalog`/`event` vía `internal/files/{id}/usage`, y
-  documentar qué campos de la respuesta directa de CMS (`context` en filas
-  `block_instance`) pierde ese mapeo genérico. Ver el hallazgo completo en
-  §3.2 y ADM-BFF-03 del plan — el diseño de los siguientes dos tickets
-  depende de esta verificación, no la des.
+El detalle ejecutable de esta feature comienza en `BFF-ADMINREAD-09`, que ya
+está en progreso arriba y debe cerrarse antes del lector.
 - [ ] **BFF-ADMINREAD-10 — `AdminFileUsageSource`.** Hub autenticado + CMS
   `SELECT`-only, deduplicado de forma estable por
   `(source, resource, resource_id, role)` prefiriendo la variante con

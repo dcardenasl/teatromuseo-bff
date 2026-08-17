@@ -158,12 +158,40 @@ abstract class BaseProxyController extends Controller
         return $data;
     }
 
-    private function respondWithException(ApiException $e): ResponseInterface
+    protected function respondWithException(ApiException $e): ResponseInterface
     {
         $result = ExceptionFormatter::format($e);
 
         return $this->response
             ->setStatusCode($result->status)
             ->setJSON($result->body);
+    }
+
+    /**
+     * Execute a controller operation with the same sanitized error contract
+     * as proxy/aggregate. Keeping this boundary here preserves the thin
+     * controller convention for dedicated projections that need to validate
+     * input before building their response envelope.
+     *
+     * @param callable(): ResponseInterface $operation
+     */
+    protected function handleOperation(callable $operation, string $source): ResponseInterface
+    {
+        try {
+            return $operation();
+        } catch (ApiException $exception) {
+            return $this->respondWithException($exception);
+        } catch (Throwable $exception) {
+            log_message('error', sprintf(
+                '%s unavailable: %s: %s',
+                $source,
+                $exception::class,
+                $exception->getMessage(),
+            ));
+
+            return $this->respondWithException(new \dcardenasl\Ci4ApiCore\Exceptions\ServiceUnavailableException(
+                $source . ' unavailable.',
+            ));
+        }
     }
 }

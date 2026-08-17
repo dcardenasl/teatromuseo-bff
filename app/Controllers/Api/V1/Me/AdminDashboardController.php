@@ -29,11 +29,13 @@ final class AdminDashboardController extends BaseProxyController
             throw new AuthenticationException('Missing authenticated user context.');
         }
 
-        $hubClient     = Services::hubDashboardClient();
-        $permissions   = $context->permissions;
-        $cmsReader     = Services::adminReadCmsDashboard();
-        $catalogReader = Services::adminReadCatalogDashboard();
-        $eventReader   = Services::adminReadEventDashboard();
+        $hubClient          = Services::hubDashboardClient();
+        $permissions        = $context->permissions;
+        $cmsReader          = Services::adminReadCmsDashboard();
+        $analyticsReader    = Services::adminReadCmsAnalyticsDashboard();
+        $translationsReader = Services::adminReadCmsTranslationsDashboard();
+        $catalogReader      = Services::adminReadCatalogDashboard();
+        $eventReader        = Services::adminReadEventDashboard();
 
         $partial = $this->aggregatePartialData([
             'hub' => static fn (): array => $hubClient->get(
@@ -41,6 +43,8 @@ final class AdminDashboardController extends BaseProxyController
                 $bearer,
             ),
             'cms' => static fn (): array => $cmsReader->read($permissions),
+            'analytics' => static fn (): array => $analyticsReader->read($permissions),
+            'translations' => static fn (): array => $translationsReader->read($permissions, $bearer),
             'catalog' => static fn (): array => $catalogReader->read($permissions),
             'event' => static fn (): array => $eventReader->read($permissions),
         ]);

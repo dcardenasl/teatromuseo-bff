@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Me;
 
 use App\AdminRead\Contracts\AdminDashboardSourceInterface;
+use App\AdminRead\Contracts\AdminDashboardTranslationsSourceInterface;
 use CodeIgniter\HTTP\CURLRequest;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
@@ -67,10 +68,14 @@ final class AdminDashboardTest extends ApiTestCase
         $this->assertSame('success', $body['status']);
         $this->assertSame('ok', $body['data']['source']['hub']);
         $this->assertSame('ok', $body['data']['source']['cms']);
+        $this->assertSame('ok', $body['data']['source']['analytics']);
+        $this->assertSame('ok', $body['data']['source']['translations']);
         $this->assertSame('ok', $body['data']['source']['catalog']);
         $this->assertSame('ok', $body['data']['source']['event']);
         $this->assertSame('ok', $body['data']['source']['state']);
         $this->assertSame(['pages' => 7], $body['data']['sections']['cms']['counts']);
+        $this->assertSame('7d', $body['data']['sections']['analytics']['analytics']['period']);
+        $this->assertSame('es', $body['data']['sections']['translations']['translations'][0]['code']);
     }
 
     public function testReturns200WhenOneSourceDegrades(): void
@@ -90,11 +95,33 @@ final class AdminDashboardTest extends ApiTestCase
 
         $this->assertSame('ok', $body['data']['source']['hub']);
         $this->assertSame('unavailable', $body['data']['source']['cms']);
+        $this->assertSame('ok', $body['data']['source']['analytics']);
+        $this->assertSame('ok', $body['data']['source']['translations']);
         $this->assertSame('ok', $body['data']['source']['catalog']);
         $this->assertSame('ok', $body['data']['source']['event']);
         $this->assertSame('partial', $body['data']['source']['state']);
         $this->assertSame([], $body['data']['sections']['cms']);
         $this->assertSame(['collection_items' => 12], $body['data']['sections']['catalog']['counts']);
+    }
+
+    public function testAnalyticsAndTranslationsDegradeIndependently(): void
+    {
+        $this->mockUpstreamCalls([
+            $this->validAuthenticatedUser(),
+            $this->summaryResponse(['users' => ['total' => 4]]),
+        ]);
+        $this->mockDashboardSources(analyticsThrows: true);
+
+        $result = $this
+            ->withHeaders(['Authorization' => 'Bearer valid-token'])
+            ->get('/api/v1/me/admin-dashboard');
+
+        $body = json_decode((string) $result->response()->getBody(), true);
+
+        $this->assertSame('unavailable', $body['data']['source']['analytics']);
+        $this->assertSame('ok', $body['data']['source']['translations']);
+        $this->assertSame([], $body['data']['sections']['analytics']);
+        $this->assertNotSame([], $body['data']['sections']['translations']);
     }
 
     public function testReturns200WhenAllSourcesAreUnavailable(): void
@@ -115,12 +142,16 @@ final class AdminDashboardTest extends ApiTestCase
 
         $this->assertSame('unavailable', $body['data']['source']['hub']);
         $this->assertSame('unavailable', $body['data']['source']['cms']);
+        $this->assertSame('unavailable', $body['data']['source']['analytics']);
+        $this->assertSame('unavailable', $body['data']['source']['translations']);
         $this->assertSame('unavailable', $body['data']['source']['catalog']);
         $this->assertSame('unavailable', $body['data']['source']['event']);
         $this->assertSame('unavailable', $body['data']['source']['state']);
         $this->assertSame([
             'hub' => [],
             'cms' => [],
+            'analytics' => [],
+            'translations' => [],
             'catalog' => [],
             'event' => [],
         ], $body['data']['sections']);
@@ -142,6 +173,8 @@ final class AdminDashboardTest extends ApiTestCase
             'permissions' => [
                 'dashboard.view',
                 'cms.pages.read',
+                'cms.analytics.read',
+                'cms.languages.read',
                 'catalog.collectionItem.read',
                 'event.events.read',
             ],
@@ -149,15 +182,22 @@ final class AdminDashboardTest extends ApiTestCase
         ]]);
     }
 
-    private function mockDashboardSources(bool $cmsThrows = false, bool $allThrow = false): void
-    {
+    private function mockDashboardSources(
+        bool $cmsThrows = false,
+        bool $allThrow = false,
+        bool $analyticsThrows = false,
+        bool $translationsThrows = false,
+    ): void {
         foreach ([
             'adminReadCmsDashboard' => ['counts' => ['pages' => 7]],
+            'adminReadCmsAnalyticsDashboard' => ['analytics' => ['period' => '7d']],
             'adminReadCatalogDashboard' => ['counts' => ['collection_items' => 12]],
             'adminReadEventDashboard' => ['counts' => ['events' => 3]],
         ] as $service => $sections) {
             $reader = $this->createMock(AdminDashboardSourceInterface::class);
-            $shouldThrow = $allThrow || ($cmsThrows && $service === 'adminReadCmsDashboard');
+            $shouldThrow = $allThrow
+                || ($cmsThrows && $service === 'adminReadCmsDashboard')
+                || ($analyticsThrows && $service === 'adminReadCmsAnalyticsDashboard');
             if ($shouldThrow) {
                 $reader->method('read')
                     ->with($this->effectivePermissionScope())
@@ -169,6 +209,17 @@ final class AdminDashboardTest extends ApiTestCase
             }
             Services::injectMock($service, $reader);
         }
+
+        $translations = $this->createMock(AdminDashboardTranslationsSourceInterface::class);
+        if ($allThrow || $translationsThrows) {
+            $translations->method('read')
+                ->willThrowException(new RuntimeException('source unavailable'));
+        } else {
+            $translations->method('read')->willReturn(['sections' => [
+                'translations' => [['code' => 'es']],
+            ]]);
+        }
+        Services::injectMock('adminReadCmsTranslationsDashboard', $translations);
     }
 
     private function effectivePermissionScope(): \PHPUnit\Framework\Constraint\Constraint
@@ -176,6 +227,8 @@ final class AdminDashboardTest extends ApiTestCase
         return $this->callback(static function (mixed $permissions): bool {
             return is_array($permissions)
                 && in_array('cms.pages.read', $permissions, true)
+                && in_array('cms.analytics.read', $permissions, true)
+                && in_array('cms.languages.read', $permissions, true)
                 && in_array('catalog.collectionItem.read', $permissions, true)
                 && in_array('event.events.read', $permissions, true);
         });

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\AdminRead;
 
 use App\AdminRead\Catalog\CatalogDashboardSource;
+use App\AdminRead\Cms\CmsAnalyticsDashboardSource;
+use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
+use App\AdminRead\Cms\CmsTranslationsDashboardSource;
 use App\AdminRead\Event\EventDashboardSource;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
@@ -29,6 +32,21 @@ final class AdminReadContainer
     public static function cmsDashboard(): CmsDashboardSource
     {
         return new CmsDashboardSource(self::database('cms_readonly'));
+    }
+
+    public static function cmsAnalyticsDashboard(): CmsAnalyticsDashboardSource
+    {
+        return new CmsAnalyticsDashboardSource(self::database('cms_readonly'));
+    }
+
+    public static function cmsAnalytics(): CmsAnalyticsSource
+    {
+        return new CmsAnalyticsSource(self::database('cms_readonly'));
+    }
+
+    public static function cmsTranslationsDashboard(): CmsTranslationsDashboardSource
+    {
+        return new CmsTranslationsDashboardSource(\Config\Services::domainClient('cms'));
     }
 
     public static function catalogDashboard(): CatalogDashboardSource
