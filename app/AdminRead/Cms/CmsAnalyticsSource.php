@@ -36,14 +36,137 @@ final class CmsAnalyticsSource implements AdminAnalyticsSourceInterface
         }
 
         $since = $this->periodSince($period);
-        $total = $this->countSince($since);
-        $pages = $this->topPagesSince($since, $total);
-        $referrers = $this->topReferrersSince($since, $total);
+        $hourly = in_array($period, ['1h', '24h'], true);
+        $bucketExpression = $this->bucketExpression($hourly);
+        $rows = ReadOnlyQuery::sql(
+            $this->db,
+            sprintf(
+                <<<'SQL'
+                WITH filtered AS (
+                    SELECT url, page_title, referrer_domain, device_type,
+                           session_id, created_at
+                    FROM page_views
+                    WHERE created_at >= ?
+                ), metrics AS (
+                    SELECT 'total' AS metric, COUNT(*) AS metric_value,
+                           NULL AS metric_text, NULL AS metric_text_2,
+                           NULL AS metric_aux
+                    FROM filtered
+                    UNION ALL
+                    SELECT 'unique' AS metric, COUNT(DISTINCT session_id) AS metric_value,
+                           NULL AS metric_text, NULL AS metric_text_2,
+                           NULL AS metric_aux
+                    FROM filtered
+                    WHERE session_id IS NOT NULL
+                    UNION ALL
+                    SELECT 'page' AS metric, views AS metric_value, url AS metric_text,
+                           page_title AS metric_text_2, NULL AS metric_aux
+                    FROM (
+                        SELECT url, page_title, COUNT(*) AS views
+                        FROM filtered
+                        GROUP BY url, page_title
+                        ORDER BY views DESC, url ASC
+                        LIMIT %d
+                    ) top_pages
+                    UNION ALL
+                    SELECT 'referrer' AS metric, views AS metric_value, domain AS metric_text,
+                           NULL AS metric_text_2, NULL AS metric_aux
+                    FROM (
+                        SELECT referrer_domain AS domain, COUNT(*) AS views
+                        FROM filtered
+                        WHERE referrer_domain IS NOT NULL
+                        GROUP BY referrer_domain
+                        ORDER BY views DESC, domain ASC
+                        LIMIT %d
+                    ) top_referrers
+                    UNION ALL
+                    SELECT 'device' AS metric, total AS metric_value, device AS metric_text,
+                           NULL AS metric_text_2, NULL AS metric_aux
+                    FROM (
+                        SELECT device_type AS device, COUNT(*) AS total
+                        FROM filtered
+                        GROUP BY device_type
+                    ) devices
+                    UNION ALL
+                    SELECT 'timeseries' AS metric, views AS metric_value, label AS metric_text,
+                           NULL AS metric_text_2, unique_visitors AS metric_aux
+                    FROM (
+                        SELECT %s AS label, COUNT(*) AS views,
+                               COUNT(DISTINCT session_id) AS unique_visitors
+                        FROM filtered
+                        GROUP BY %s
+                        ORDER BY label ASC
+                    ) timeseries
+                )
+                SELECT metric, metric_value, metric_text, metric_text_2, metric_aux
+                FROM metrics
+                SQL,
+                self::TOP_LIMIT,
+                self::TOP_LIMIT,
+                $bucketExpression,
+                $bucketExpression,
+            ),
+            [$since],
+            'CMS analytics projection',
+        );
+
+        $total = 0;
+        $uniqueVisitors = 0;
+        $rawPages = [];
+        $rawReferrers = [];
+        $devices = ['desktop' => 0, 'mobile' => 0, 'tablet' => 0, 'bot' => 0, 'unknown' => 0];
+        $timeseries = [];
+
+        foreach ($rows as $row) {
+            $metric = (string) ($row['metric'] ?? '');
+            $value = (int) ($row['metric_value'] ?? 0);
+            $text = isset($row['metric_text']) ? (string) $row['metric_text'] : '';
+
+            switch ($metric) {
+                case 'total':
+                    $total = $value;
+                    break;
+                case 'unique':
+                    $uniqueVisitors = $value;
+                    break;
+                case 'page':
+                    $rawPages[] = [
+                        'url' => $text,
+                        'page_title' => isset($row['metric_text_2']) ? (string) $row['metric_text_2'] : null,
+                        'views' => $value,
+                    ];
+                    break;
+                case 'referrer':
+                    $rawReferrers[] = ['domain' => $text, 'views' => $value];
+                    break;
+                case 'device':
+                    if (array_key_exists($text, $devices)) {
+                        $devices[$text] = $value;
+                    }
+                    break;
+                case 'timeseries':
+                    $timeseries[] = [
+                        'label' => $text,
+                        'views' => $value,
+                        'unique_visitors' => (int) ($row['metric_aux'] ?? 0),
+                    ];
+                    break;
+            }
+        }
+
+        $pages = array_map(
+            fn (array $row): array => $row + ['percentage' => $this->percentageOf($row['views'], $total)],
+            $rawPages,
+        );
+        $referrers = array_map(
+            fn (array $row): array => $row + ['percentage' => $this->percentageOf($row['views'], $total)],
+            $rawReferrers,
+        );
 
         return [
             'overview' => [
                 'total_views' => $total,
-                'unique_visitors' => $this->uniqueVisitorsSince($since),
+                'unique_visitors' => $uniqueVisitors,
                 'top_page' => $pages[0]['url'] ?? null,
                 'top_page_title' => $pages[0]['page_title'] ?? null,
                 'top_referrer' => $referrers[0]['domain'] ?? null,
@@ -51,11 +174,8 @@ final class CmsAnalyticsSource implements AdminAnalyticsSourceInterface
             ],
             'pages' => ['data' => $pages, 'period' => $period],
             'referrers' => ['data' => $referrers, 'period' => $period],
-            'devices' => array_merge($this->deviceBreakdownSince($since), ['period' => $period]),
-            'timeseries' => [
-                'data' => $this->timeseriesSince($since, in_array($period, ['1h', '24h'], true)),
-                'period' => $period,
-            ],
+            'devices' => $devices + ['period' => $period],
+            'timeseries' => ['data' => $timeseries, 'period' => $period],
         ];
     }
 
@@ -70,119 +190,15 @@ final class CmsAnalyticsSource implements AdminAnalyticsSourceInterface
         };
     }
 
-    private function countSince(string $since): int
+    private function bucketExpression(bool $hourly): string
     {
-        return ReadOnlyQuery::count(
-            $this->db->table('page_views')->where('created_at >=', $since),
-            'CMS analytics total views',
-        );
-    }
-
-    private function uniqueVisitorsSince(string $since): int
-    {
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('page_views')
-                ->select('COUNT(DISTINCT session_id) AS total', false)
-                ->where('created_at >=', $since)
-                ->where('session_id IS NOT NULL', null, false),
-            'CMS analytics unique visitors',
-        );
-
-        return (int) ($rows[0]['total'] ?? 0);
-    }
-
-    /** @return list<array{url: string, page_title: string|null, views: int, percentage: float}> */
-    private function topPagesSince(string $since, int $total): array
-    {
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('page_views')
-                ->select('url, page_title, COUNT(*) AS views', false)
-                ->where('created_at >=', $since)
-                ->groupBy('url, page_title')
-                ->orderBy('views', 'DESC')
-                ->limit(self::TOP_LIMIT),
-            'CMS analytics top pages',
-        );
-
-        return array_map(function (array $row) use ($total): array {
-            $views = (int) ($row['views'] ?? 0);
-
-            return [
-                'url' => (string) ($row['url'] ?? ''),
-                'page_title' => isset($row['page_title']) ? (string) $row['page_title'] : null,
-                'views' => $views,
-                'percentage' => $this->percentageOf($views, $total),
-            ];
-        }, $rows);
-    }
-
-    /** @return list<array{domain: string, views: int, percentage: float}> */
-    private function topReferrersSince(string $since, int $total): array
-    {
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('page_views')
-                ->select('referrer_domain AS domain, COUNT(*) AS views', false)
-                ->where('created_at >=', $since)
-                ->where('referrer_domain IS NOT NULL', null, false)
-                ->groupBy('referrer_domain')
-                ->orderBy('views', 'DESC')
-                ->limit(self::TOP_LIMIT),
-            'CMS analytics top referrers',
-        );
-
-        return array_map(function (array $row) use ($total): array {
-            $views = (int) ($row['views'] ?? 0);
-
-            return [
-                'domain' => (string) ($row['domain'] ?? ''),
-                'views' => $views,
-                'percentage' => $this->percentageOf($views, $total),
-            ];
-        }, $rows);
-    }
-
-    /** @return array{desktop: int, mobile: int, tablet: int, bot: int, unknown: int} */
-    private function deviceBreakdownSince(string $since): array
-    {
-        $breakdown = ['desktop' => 0, 'mobile' => 0, 'tablet' => 0, 'bot' => 0, 'unknown' => 0];
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('page_views')
-                ->select('device_type, COUNT(*) AS total', false)
-                ->where('created_at >=', $since)
-                ->groupBy('device_type'),
-            'CMS analytics devices',
-        );
-
-        foreach ($rows as $row) {
-            $device = (string) ($row['device_type'] ?? '');
-            if (array_key_exists($device, $breakdown)) {
-                $breakdown[$device] = (int) ($row['total'] ?? 0);
-            }
+        if (! $hourly) {
+            return 'DATE(created_at)';
         }
 
-        return $breakdown;
-    }
-
-    /** @return list<array{label: string, views: int, unique_visitors: int}> */
-    private function timeseriesSince(string $since, bool $hourly): array
-    {
-        $expression = $hourly
-            ? "DATE_FORMAT(created_at, '%Y-%m-%d %H:00')"
-            : 'DATE(created_at)';
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('page_views')
-                ->select($expression . ' AS label, COUNT(*) AS views, COUNT(DISTINCT session_id) AS unique_visitors', false)
-                ->where('created_at >=', $since)
-                ->groupBy($expression)
-                ->orderBy('label', 'ASC'),
-            'CMS analytics timeseries',
-        );
-
-        return array_map(static fn (array $row): array => [
-            'label' => (string) ($row['label'] ?? ''),
-            'views' => (int) ($row['views'] ?? 0),
-            'unique_visitors' => (int) ($row['unique_visitors'] ?? 0),
-        ], $rows);
+        return $this->db->DBDriver === 'SQLite3'
+            ? "strftime('%Y-%m-%d %H:00', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m-%d %H:00')";
     }
 
     private function percentageOf(int $count, int $total): float
