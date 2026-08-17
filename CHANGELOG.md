@@ -33,9 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/bootstrap` variant accept an HMAC-signed `preview` token (`CMS_PREVIEW_SECRET`) to
   resolve unpublished pages; without a valid signature they fail closed to the published
   page.
+- **Structured request telemetry** — the BFF now emits one bounded, structured log entry per
+  request (`request_id`, path, seam, duration, status, response bytes, per-source duration/state
+  and cache hit/miss counts) via a new global `telemetry` filter. Proxy/aggregator calls and
+  `page-resolve` record their own source timing; admin read sources record cache hit/miss.
+  Payloads, tokens and upstream bodies are never logged.
 
 ### Changed
 
+- **`app/AdminRead/Cms/CmsTranslationsDashboardSource`** — the dashboard translations widget
+  now issues one bounded SQL projection per active language against the CMS read-only
+  connection instead of calling the CMS audit endpoint, matching the BFF's SQL-first rule.
+  Response shape is unchanged.
 - **`app/AdminRead/**` dashboard/analytics sources** — Catalog, Event, CMS dashboard and
   CMS analytics projections now issue one bounded SQL query per source (UNION ALL / CTE
   with database-side aggregation) instead of one query per resource followed by PHP-side
