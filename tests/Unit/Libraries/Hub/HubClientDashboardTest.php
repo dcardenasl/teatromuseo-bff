@@ -45,4 +45,41 @@ final class HubClientDashboardTest extends CIUnitTestCase
         $this->assertSame('Bearer visitor-token', $capturedOptions['headers']['Authorization']);
         $this->assertSame('application/json', $capturedOptions['headers']['Accept']);
     }
+
+    public function testGetAuthenticatedUserReadsCanonicalHubProfile(): void
+    {
+        $capturedOptions = null;
+        $response        = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getBody')->willReturn(json_encode([
+            'data' => [
+                'id'          => 42,
+                'permissions' => ['cms.pages.read', 'event.events.read'],
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $http = $this->createMock(CURLRequest::class);
+        $http->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedOptions, $response): ResponseInterface {
+                $this->assertSame('GET', $method);
+                $this->assertSame('http://hub.test/api/v1/auth/me', $url);
+                $capturedOptions = $options;
+
+                return $response;
+            });
+
+        $config = new \dcardenasl\Ci4ApiCore\Http\Client\HubClientConfig(
+            url: 'http://hub.test',
+            apiKey: 'test-key',
+            httpTimeout: 5,
+        );
+        $client = new HubClient($config, $http, $this->createMock(CacheInterface::class));
+
+        $result = $client->getAuthenticatedUser('visitor-token');
+
+        $this->assertSame(42, $result['id']);
+        $this->assertSame(['cms.pages.read', 'event.events.read'], $result['permissions']);
+        $this->assertSame('Bearer visitor-token', $capturedOptions['headers']['Authorization']);
+    }
 }

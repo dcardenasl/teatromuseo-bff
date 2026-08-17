@@ -36,10 +36,10 @@ final class AdminDashboardTest extends ApiTestCase
         $result->assertStatus(401);
     }
 
-    public function testReturns401WhenIntrospectRejectsTheToken(): void
+    public function testReturns401WhenHubRejectsTheAuthenticatedUser(): void
     {
         $this->mockUpstreamCalls([
-            $this->jsonResponse(200, ['data' => ['valid' => false, 'error' => 'expired']]),
+            $this->jsonResponse(401, ['message' => 'invalid token']),
         ]);
 
         $result = $this
@@ -52,7 +52,7 @@ final class AdminDashboardTest extends ApiTestCase
     public function testReturns200WithAllFourSourcesAvailable(): void
     {
         $this->mockUpstreamCalls([
-            $this->validIntrospection(),
+            $this->validAuthenticatedUser(),
             $this->summaryResponse(['users' => ['total' => 4]]),
         ]);
         $this->mockDashboardSources();
@@ -76,7 +76,7 @@ final class AdminDashboardTest extends ApiTestCase
     public function testReturns200WhenOneSourceDegrades(): void
     {
         $this->mockUpstreamCalls([
-            $this->validIntrospection(),
+            $this->validAuthenticatedUser(),
             $this->summaryResponse(['users' => ['total' => 4]]),
         ]);
         $this->mockDashboardSources(cmsThrows: true);
@@ -100,7 +100,7 @@ final class AdminDashboardTest extends ApiTestCase
     public function testReturns200WhenAllSourcesAreUnavailable(): void
     {
         $this->mockUpstreamCalls([
-            $this->validIntrospection(),
+            $this->validAuthenticatedUser(),
             $this->jsonResponse(503, ['message' => 'upstream unavailable']),
             $this->jsonResponse(503, ['message' => 'upstream unavailable']),
         ]);
@@ -135,11 +135,10 @@ final class AdminDashboardTest extends ApiTestCase
         Services::injectMock('curlrequest', $http);
     }
 
-    private function validIntrospection(): ResponseInterface
+    private function validAuthenticatedUser(): ResponseInterface
     {
         return $this->jsonResponse(200, ['data' => [
-            'valid'       => true,
-            'uid'         => 42,
+            'id'          => 42,
             'permissions' => [
                 'dashboard.view',
                 'cms.pages.read',
@@ -160,12 +159,26 @@ final class AdminDashboardTest extends ApiTestCase
             $reader = $this->createMock(AdminDashboardSourceInterface::class);
             $shouldThrow = $allThrow || ($cmsThrows && $service === 'adminReadCmsDashboard');
             if ($shouldThrow) {
-                $reader->method('read')->willThrowException(new RuntimeException('source unavailable'));
+                $reader->method('read')
+                    ->with($this->effectivePermissionScope())
+                    ->willThrowException(new RuntimeException('source unavailable'));
             } else {
-                $reader->method('read')->willReturn(['sections' => $sections]);
+                $reader->method('read')
+                    ->with($this->effectivePermissionScope())
+                    ->willReturn(['sections' => $sections]);
             }
             Services::injectMock($service, $reader);
         }
+    }
+
+    private function effectivePermissionScope(): \PHPUnit\Framework\Constraint\Constraint
+    {
+        return $this->callback(static function (mixed $permissions): bool {
+            return is_array($permissions)
+                && in_array('cms.pages.read', $permissions, true)
+                && in_array('catalog.collectionItem.read', $permissions, true)
+                && in_array('event.events.read', $permissions, true);
+        });
     }
 
     /** @param array<string, mixed> $sections */

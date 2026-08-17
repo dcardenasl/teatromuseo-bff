@@ -30,4 +30,18 @@ class HubClient extends CoreHubClient
             ],
         ]);
     }
+
+    /**
+     * Fetch the canonical authenticated-user projection from the Hub.
+     *
+     * Unlike /auth/introspect, /auth/me resolves the user's effective
+     * permissions across all registered applications. This is required by
+     * BFF projections that compose more than one domain application.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAuthenticatedUser(string $bearerToken): array
+    {
+        return $this->get('/api/v1/auth/me', $bearerToken);
+    }
 }

@@ -13,5 +13,5 @@ $routes->get(
 $routes->get(
     'me/admin-dashboard',
     '\App\Controllers\Api\V1\Me\AdminDashboardController::index',
-    ['filter' => 'introspectauth'],
+    ['filter' => 'effectivepermissionsauth'],
 );

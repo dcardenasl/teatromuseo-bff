@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Config;
 
+use App\Filters\EffectivePermissionsAuthFilter;
 use App\Filters\IntrospectAuthFilter;
 use App\Filters\ThrottleFilter;
 use CodeIgniter\Config\Filters as BaseFilters;
@@ -45,6 +46,7 @@ class Filters extends BaseFilters
         'performance'        => PerformanceMetrics::class,
         'throttle'           => ThrottleFilter::class,
         'introspectauth'     => IntrospectAuthFilter::class,
+        'effectivepermissionsauth' => EffectivePermissionsAuthFilter::class,
         'webappkey'          => \App\Filters\WebAppKeyRequiredFilter::class,
         'publicTelemetry'    => \App\Filters\PublicReadTelemetryFilter::class,
         'locale'             => LocaleFilter::class,

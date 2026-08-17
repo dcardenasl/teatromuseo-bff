@@ -88,10 +88,16 @@ Base classes live in `dcardenasl/ci4-api-core` (Packagist):
   passthroughs, `aggregate()` for fan-out + merge into a single
   `ApiResponse::success({...})` envelope. Catches `ApiException` and renders
   via `ExceptionFormatter` so error wire-shape matches the rest of the kit.
-- `App\Filters\IntrospectAuthFilter` (BFF-106) — opt-in JWT auth. Delegates
-  `decodeToken()` to `HubClient::introspect()` and populates
-  `ContextHolder::get()` with `{user_id, permissions}`. The BFF never holds
-  the JWT secret; introspect responses are cached.
+- `App\Filters\IntrospectAuthFilter` (BFF-106) — opt-in JWT auth for
+  application-scoped contexts. Delegates `decodeToken()` to
+  `HubClient::introspect()` and populates `ContextHolder::get()` with
+  `{user_id, permissions}`. The BFF never holds the JWT secret; introspect
+  responses are cached.
+- `App\Filters\EffectivePermissionsAuthFilter` — opt-in JWT auth for
+  cross-application projections. Delegates validation to the Hub's canonical
+  `GET /api/v1/auth/me`, which resolves effective permissions across all
+  applications. It adapts only the returned identity/scope into the shared
+  security context; it never decodes the JWT locally or shares API keys.
 - `App\Libraries\Hub\HubClient` — the only place that calls the hub. Holds
   the cached service token (`getServiceToken()`); auto-renews
   `Config\Hub::$serviceTokenSafetyMargin` seconds before expiry.
@@ -102,7 +108,7 @@ Base classes live in `dcardenasl/ci4-api-core` (Packagist):
   timeouts. Endpoint paths (`$introspectPath`, `$serviceTokenPath`,
   `$permissionsPath`) live here so a hub API bump is a one-config change.
 - **No** `DomainAuthFilter` and **no** `PermissionFilter` — by design.
-  Backend validates; BFF forwards. `IntrospectAuthFilter` is route-level
+  Backend validates; BFF forwards. Both auth-context filters are route-level
   opt-in only.
 
 `BaseProxyController::aggregate()` is currently sequential by design. The
@@ -168,11 +174,21 @@ class StatusController extends BaseProxyController
 
 The wire shape is `{status: "success", data: {hub_version: {...}, platform_info: {...}}}`.
 
-### Pattern 3 — Introspect-protected aggregator (needs user context)
+### Pattern 3 — Authenticated aggregator (needs user context)
 
 Use when the response depends on the authenticated user — and the BFF
-must therefore know who they are. Attach `introspectauth` at the route
-level and read `ContextHolder::get()` inside the controller:
+must therefore know who they are. Choose the route-level auth context that
+matches the projection:
+
+- `introspectauth` for one application's permission scope and the canonical
+  `/me/dashboard` example.
+- `effectivepermissionsauth` for a projection that composes permissions and
+  data across multiple applications, such as `/me/admin-dashboard`.
+
+Both filters delegate token validation to the Hub and expose the same
+`ContextHolder::get()` contract to the controller. The second filter uses the
+Hub's canonical `/auth/me` projection because `/auth/introspect` is
+intentionally scoped to the caller's `X-App-Key` application.
 
 ```php
 // app/Config/Routes/v1/me.php
@@ -223,8 +239,9 @@ different contracts:
   `aggregatePartial()`, so one unavailable source does not hide healthy
   sections. The Hub summary remains an authenticated upstream call; CMS,
   Catalog and Event use `app/AdminRead/**` direct SELECT-only readers. The
-  readers apply the permissions obtained by Hub introspection and preserve the
-  existing source-level degradation contract.
+  route uses `effectivepermissionsauth` so readers receive the canonical
+  cross-application permission scope from Hub `/auth/me`, while the existing
+  source-level degradation contract remains unchanged.
 
 ### What ships out of the box
 
@@ -249,14 +266,19 @@ new endpoint isn't annotated under `app/Documentation/`.
 | `bff.domainUrl` | Base URL of the upstream domain app (optional) |
 | `BFF_ALLOWED_ORIGINS` | Comma-separated CORS allow-list. Empty in production = throw. |
 | `encryption.key` | CI4 encryption key (32 bytes after `hex2bin:` decode) |
-| `hub.appCode`, `hub.apiKey` | Only needed if the BFF uses a service token for M2M calls |
+| `hub.appCode`, `hub.apiKey` | Identity for the BFF's own Hub app-key calls; keep it separate from the Admin key |
 | `CMS_READONLY_DB_*`, `CATALOG_READONLY_DB_*`, `EVENT_READONLY_DB_*`, `HUB_READONLY_DB_*` | SELECT-only credentials for the isolated `app/PublicRead/**` and authenticated `app/AdminRead/**` seams |
 
 ## Common pitfalls
 
 - ❌ **Decoding JWTs locally.** The BFF never holds the JWT secret. If a
-  route needs the user context, use `IntrospectAuthFilter` (delegates to
-  the hub) — never `firebase/php-jwt` or similar.
+  route needs the user context, use the appropriate Hub-backed filter
+  (`IntrospectAuthFilter` or `EffectivePermissionsAuthFilter`) — never
+  `firebase/php-jwt` or similar.
+- ❌ **Sharing API keys between applications.** `hub.apiKey` identifies the
+  BFF application for its own Hub calls; it must not be replaced with the
+  Admin key to manufacture a cross-application permission scope. Use
+  `effectivepermissionsauth` for that explicit projection instead.
 - ❌ **Making `IntrospectAuthFilter` global.** It is route-level opt-in by
   design. The default flow stays forward-only so most endpoints incur no
   introspect cost.

@@ -12,7 +12,12 @@ forwards requests to the Hub (`8180`) or configured domain apps.
 - The BFF never decodes JWTs or holds the JWT secret.
 - It forwards the client's `Authorization` header to upstream services.
 - `IntrospectAuthFilter` is an opt-in route filter that asks the Hub to
-  introspect a token and puts the resulting user context in `ContextHolder`.
+  introspect a token and puts the application-scoped user context in
+  `ContextHolder`.
+- `EffectivePermissionsAuthFilter` is an opt-in route filter for
+  cross-application projections; it asks the Hub's canonical `/auth/me` for
+  the user's effective permissions and adapts that response into
+  `ContextHolder`.
 - `HubClient` is the only class that calls Hub URLs directly.
 
 Read this repository's `CLAUDE.md` and `TASKS.md` before editing. Check the
@@ -23,7 +28,9 @@ repository status first and keep unrelated work intact.
 - `app/Controllers/Api/V1/` — proxy and aggregator controllers.
 - `app/Controllers/BaseProxyController.php` — `proxy()` and `aggregate()`.
 - `app/Libraries/Hub/HubClient.php` — outbound Hub client and cached Hub calls.
-- `app/Filters/IntrospectAuthFilter.php` — optional route-level auth context.
+- `app/Filters/IntrospectAuthFilter.php` — optional application-scoped auth context.
+- `app/Filters/EffectivePermissionsAuthFilter.php` — optional
+  cross-application auth context for composed Admin projections.
 - `app/Config/Bff.php` — Hub/domain URLs and CORS origins.
 - `app/Config/Hub.php` — Hub client credentials, paths, and timeouts.
 - `app/Config/Routes/v1/*.php` — versioned route files, loaded automatically.
@@ -55,8 +62,10 @@ Choose exactly one pattern per endpoint:
    `BaseProxyController::proxy()`.
 2. **Aggregator:** fan out calls and merge them through
    `BaseProxyController::aggregate()`.
-3. **Introspect-protected aggregator:** add `introspectauth` on the route,
-   read `ContextHolder::get()`, and use the authenticated context explicitly.
+3. **Authenticated aggregator:** add `introspectauth` for an
+   application-scoped context or `effectivepermissionsauth` for a
+   cross-application context; read `ContextHolder::get()` and use the
+   authenticated context explicitly.
 
 Forward only through the configured client. Preserve the canonical response
 and exception behavior supplied by the base controller and service client.
@@ -66,8 +75,8 @@ only in a controller.
 ## Anti-patterns
 
 - Do not add models, migrations, sessions, user storage, or local IAM here.
-- Do not decode or verify JWTs locally; use Hub introspection when user context
-  is genuinely required.
+- Do not decode or verify JWTs locally; use the appropriate Hub-backed auth
+  filter when user context is genuinely required.
 - Do not make `IntrospectAuthFilter` global; it is intentionally route-level.
 - Do not bypass `BaseProxyController::proxy()` or `aggregate()` for HTTP calls.
 - Do not call Hub URLs directly from controllers; use `HubClient`/services.
