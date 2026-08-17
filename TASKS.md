@@ -405,15 +405,15 @@ El lector y endpoint de esta feature están cerrados arriba; el Admin puede
 comenzar su mitad (`ADM-BFF-05/06`).
 
 **Feature 4 — Lookups administrativos de Event**
-- [ ] **BFF-ADMINREAD-12 — `EventAdminLookupSource`.** Un método/adapter por
-  contexto, permisos antes de consultar, límite 100 y cache corto por
-  contexto + scope de permisos. Mover a `🔴 En progreso` después de cerrar
-  `ADM-BFF-05/06`.
+- [x] **BFF-ADMINREAD-12 — `EventAdminLookupSource`.** Cerrada 2026-08-17.
+  Se añadieron cinco contextos cerrados, permisos antes de consultar, columnas
+  explícitas con límite 100 y cache de 30 s por contexto + scope de permisos;
+  las pruebas unitarias cubren permiso, contexto y cache.
 
 - [ ] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
-  Enum cerrado de `context`; tests de contexto inválido, permiso, catálogo
-  vacío (distinto de fuente no disponible) y fuente caída; `composer
-  quality`.
+  🔴 En progreso. Enum cerrado de `context`, filtro `introspectauth` por ser
+  una lectura exclusiva del Event domain; tests de contexto inválido, permiso,
+  catálogo vacío (distinto de fuente no disponible) y fuente caída.
 
 **Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
 

@@ -9,6 +9,7 @@ use App\AdminRead\Cms\CmsAnalyticsDashboardSource;
 use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
 use App\AdminRead\Cms\CmsTranslationsDashboardSource;
+use App\AdminRead\Event\AdminEventLookupSource;
 use App\AdminRead\Event\EventDashboardSource;
 use App\AdminRead\Files\AdminFileUsageSource;
 use CodeIgniter\Database\BaseConnection;
@@ -65,6 +66,14 @@ final class AdminReadContainer
         return new AdminFileUsageSource(
             \Config\Services::hubDashboardClient(),
             self::database('cms_readonly'),
+        );
+    }
+
+    public static function eventLookups(): AdminEventLookupSource
+    {
+        return new AdminEventLookupSource(
+            self::database('event_readonly'),
+            \Config\Services::cache(),
         );
     }
 }
