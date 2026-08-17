@@ -7,6 +7,7 @@ namespace App\AdminRead\Cms;
 use App\AdminRead\Contracts\AdminCmsBootstrapSourceInterface;
 use App\Libraries\Domain\DomainClient;
 use CodeIgniter\Cache\CacheInterface;
+use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 use InvalidArgumentException;
 use RuntimeException;
@@ -25,6 +26,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
     public function __construct(
         private readonly DomainClient $client,
         private readonly CacheInterface $cache,
+        private readonly ?BaseConnection $readDb = null,
     ) {
     }
 
@@ -83,11 +85,13 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
             return $cached;
         }
 
-        $sections = [
-            'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
-            'pages'       => $this->items('/cms/pages?limit=250', $bearerToken),
-            'collections' => $this->items('/cms/collections?limit=200&is_active=1&projection=list', $bearerToken),
-        ];
+        $sections = $this->readDb !== null
+            ? $this->directPageFormOptions()
+            : [
+                'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
+                'pages'       => $this->items('/cms/pages?limit=250', $bearerToken),
+                'collections' => $this->items('/cms/collections?limit=200&is_active=1&projection=list', $bearerToken),
+            ];
 
         $this->cache->save($cacheKey, $sections, self::CACHE_TTL);
 
@@ -179,6 +183,85 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                 throw new AuthorizationException('The ' . $permission . ' permission is required.');
             }
         }
+    }
+
+    /** @return array<string, list<array<string, mixed>>> */
+    private function directPageFormOptions(): array
+    {
+        $db = $this->readDb ?? throw new RuntimeException('CMS read connection is not configured.');
+        $languages = $this->rows(
+            $db->table('cms_languages')
+                ->select('id, code, name, native_name, is_default, is_active, fallback_language_id, sort_order')
+                ->where('is_active', 1)
+                ->orderBy('sort_order', 'ASC')
+                ->orderBy('id', 'ASC'),
+        );
+        $pages = $this->rows(
+            $db->table('cms_pages')
+                ->select('id, parent_id, collection_id, page_type, status, sort_order, created_at, updated_at')
+                ->where('deleted_at', null)
+                ->orderBy('sort_order', 'ASC')
+                ->orderBy('id', 'ASC')
+                ->limit(250),
+        );
+        $collections = $this->rows(
+            $db->table('cms_collections')
+                ->select('id, collection_key, collection_type, is_active, sort_order')
+                ->where('is_active', 1)
+                ->orderBy('sort_order', 'ASC')
+                ->orderBy('id', 'ASC')
+                ->limit(200),
+        );
+
+        $pageIds = array_values(array_map(static fn (array $row): int => (int) $row['id'], $pages));
+        if ($pageIds !== []) {
+            $translations = $this->rows(
+                $db->table('cms_page_translations')
+                    ->select('page_id, language_id, slug, title')
+                    ->whereIn('page_id', $pageIds)
+                    ->orderBy('language_id', 'ASC'),
+            );
+            $translationsByPage = [];
+            foreach ($translations as $translation) {
+                $translationsByPage[(int) $translation['page_id']][] = $translation;
+            }
+            foreach ($pages as &$page) {
+                $page['translations'] = $translationsByPage[(int) $page['id']] ?? [];
+            }
+            unset($page);
+        }
+
+        $collectionIds = array_values(array_map(static fn (array $row): int => (int) $row['id'], $collections));
+        if ($collectionIds !== []) {
+            $translations = $this->rows(
+                $db->table('cms_collection_translations')
+                    ->select('collection_id, language_id, slug, name')
+                    ->whereIn('collection_id', $collectionIds)
+                    ->orderBy('language_id', 'ASC'),
+            );
+            $translationsByCollection = [];
+            foreach ($translations as $translation) {
+                $translationsByCollection[(int) $translation['collection_id']][] = $translation;
+            }
+            foreach ($collections as &$collection) {
+                $collection['translations'] = $translationsByCollection[(int) $collection['id']] ?? [];
+                $collection['name'] = (string) ($collection['translations'][0]['name'] ?? $collection['collection_key']);
+            }
+            unset($collection);
+        }
+
+        return compact('languages', 'pages', 'collections');
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function rows(\CodeIgniter\Database\BaseBuilder $builder): array
+    {
+        $result = $builder->get();
+        if ($result === false) {
+            throw new RuntimeException('CMS form bootstrap read failed.');
+        }
+
+        return array_values($result->getResultArray());
     }
 
     /** @param list<string> $permissions */

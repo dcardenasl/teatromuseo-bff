@@ -432,9 +432,10 @@ comenzar su mitad (`ADM-BFF-05/06`).
 - [x] **BFF-ADMINREAD-15 — Bootstraps CMS aprobados.**
   Cerrada 2026-08-17. Se agregaron las proyecciones autenticadas
   `entry-form-options`, `page-form-options`, `menu-editor-bootstrap` y
-  `site-identity-bootstrap`, con permisos efectivos, caché corto por scope,
-  pruebas de endpoint y pruebas unitarias de composición. BlockInstance y
-  Wizard quedan explícitamente diferidos.
+  `site-identity-bootstrap`, además de `entry-workspace` y
+  `wizard-bootstrap`, con permisos efectivos, caché corto por scope, pruebas
+  de endpoint y pruebas unitarias de composición. BlockInstance comparte el
+  workspace para páginas y entradas; Wizard usa su propio bundle.
 
 ### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 

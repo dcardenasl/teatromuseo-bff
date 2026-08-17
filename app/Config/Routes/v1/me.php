@@ -69,3 +69,18 @@ $routes->get(
     '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::siteIdentityBootstrap',
     ['filter' => 'effectivepermissionsauth'],
 );
+$routes->get(
+    'me/admin-cms/pages/(:num)/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsWorkspaceController::page/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/entries/(:num)/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsWorkspaceController::entry/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/wizard-bootstrap',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsWizardController::bootstrap',
+    ['filter' => 'effectivepermissionsauth'],
+);

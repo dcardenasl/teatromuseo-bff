@@ -220,6 +220,24 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::cmsBootstrap();
     }
 
+    public static function adminReadCmsWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsWorkspace();
+    }
+
+    public static function adminReadCmsWizard(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsWizardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsWizard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsWizard();
+    }
+
     public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
     {
         if ($getShared) {

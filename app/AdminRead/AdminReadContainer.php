@@ -6,6 +6,8 @@ namespace App\AdminRead;
 
 use App\AdminRead\Catalog\CatalogDashboardSource;
 use App\AdminRead\Cms\AdminCmsBootstrapSource;
+use App\AdminRead\Cms\AdminCmsWizardSource;
+use App\AdminRead\Cms\AdminCmsWorkspaceSource;
 use App\AdminRead\Cms\CmsAnalyticsDashboardSource;
 use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
@@ -81,6 +83,33 @@ final class AdminReadContainer
     public static function cmsBootstrap(): AdminCmsBootstrapSource
     {
         return new AdminCmsBootstrapSource(
+            \Config\Services::domainClient('cms'),
+            \Config\Services::cache(),
+            self::database('cms_readonly'),
+        );
+    }
+
+    public static function cmsWorkspace(): AdminCmsWorkspaceSource
+    {
+        $bff = config('Bff');
+        $hubPublicBaseUrl = (string) ($bff->hubPublicBaseUrl ?? '');
+
+        return new AdminCmsWorkspaceSource(
+            self::database('cms_readonly'),
+            new \App\PublicRead\Cms\FileUrlResolver(
+                new \App\PublicRead\Support\DirectDbFileMetaResolver(
+                    self::database('hub_readonly'),
+                    $hubPublicBaseUrl,
+                ),
+                $hubPublicBaseUrl,
+            ),
+            \Config\Services::cache(),
+        );
+    }
+
+    public static function cmsWizard(): AdminCmsWizardSource
+    {
+        return new AdminCmsWizardSource(
             \Config\Services::domainClient('cms'),
             \Config\Services::cache(),
         );
