@@ -7,6 +7,7 @@ namespace App\AdminRead\Cms;
 use App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface;
 use App\AdminRead\Support\ReadOnlyQuery;
 use App\PublicRead\Cms\FileUrlResolver;
+use App\Support\RequestTelemetry;
 use CodeIgniter\Cache\CacheInterface;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
@@ -201,8 +202,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
     {
         $cached = $this->cache->get('admin_cms_workspace_languages');
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.workspace.languages', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.workspace.languages', 'miss');
 
         $rows = ReadOnlyQuery::rows(
             $this->db->table('cms_languages')
@@ -292,8 +296,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
     {
         $cached = $this->cache->get('admin_cms_workspace_block_types');
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.workspace.block-types', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.workspace.block-types', 'miss');
 
         $rows = ReadOnlyQuery::rows(
             $this->db->table('cms_content_blocks')
@@ -327,8 +334,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
     {
         $cached = $this->cache->get('admin_cms_workspace_pages');
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.workspace.pages', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.workspace.pages', 'miss');
 
         $pages = ReadOnlyQuery::rows(
             $this->db->table('cms_pages')
@@ -366,8 +376,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
     {
         $cached = $this->cache->get('admin_cms_workspace_collections');
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.workspace.collections', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.workspace.collections', 'miss');
 
         $collections = ReadOnlyQuery::rows(
             $this->db->table('cms_collections')

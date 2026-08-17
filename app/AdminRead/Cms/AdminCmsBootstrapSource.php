@@ -6,6 +6,7 @@ namespace App\AdminRead\Cms;
 
 use App\AdminRead\Contracts\AdminCmsBootstrapSourceInterface;
 use App\Libraries\Domain\DomainClient;
+use App\Support\RequestTelemetry;
 use CodeIgniter\Cache\CacheInterface;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
@@ -46,8 +47,11 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         );
         $cached = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.bootstrap.entry-form-options', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.bootstrap.entry-form-options', 'miss');
 
         $sections = [
             'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
@@ -82,8 +86,11 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         );
         $cached = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.bootstrap.page-form-options', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.bootstrap.page-form-options', 'miss');
 
         $sections = $this->readDb !== null
             ? $this->directPageFormOptions()
@@ -121,8 +128,11 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         );
         $cached = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.bootstrap.menu-editor', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.bootstrap.menu-editor', 'miss');
 
         $sections = [
             'menu'        => $this->data('/cms/menus/' . $menuId, $bearerToken),
@@ -153,8 +163,11 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         $cacheKey = $this->cacheKey('site-identity', $permissions);
         $cached = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.bootstrap.site-identity', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.bootstrap.site-identity', 'miss');
 
         $sections = [
             'settings'  => array_merge(

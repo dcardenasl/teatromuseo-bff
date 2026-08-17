@@ -6,6 +6,7 @@ namespace App\AdminRead\Event;
 
 use App\AdminRead\Contracts\AdminEventLookupSourceInterface;
 use App\AdminRead\Support\ReadOnlyQuery;
+use App\Support\RequestTelemetry;
 use CodeIgniter\Cache\CacheInterface;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
@@ -50,8 +51,11 @@ final class AdminEventLookupSource implements AdminEventLookupSourceInterface
         $cacheKey = $this->cacheKey($context, $permissions);
         $cached   = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.event.lookup.' . $context, 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.event.lookup.' . $context, 'miss');
 
         $data = match ($context) {
             'occurrence' => $this->occurrenceLookups(),

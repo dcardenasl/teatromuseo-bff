@@ -6,6 +6,7 @@ namespace App\AdminRead\Cms;
 
 use App\AdminRead\Contracts\AdminCmsWizardSourceInterface;
 use App\Libraries\Domain\DomainClient;
+use App\Support\RequestTelemetry;
 use CodeIgniter\Cache\CacheInterface;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 use RuntimeException;
@@ -33,8 +34,11 @@ final class AdminCmsWizardSource implements AdminCmsWizardSourceInterface
         $cacheKey = 'admin_cms_wizard_' . hash('sha256', implode("\0", $scope));
         $cached = $this->cache->get($cacheKey);
         if (is_array($cached)) {
+            RequestTelemetry::recordCache('admin.cms.wizard', 'hit');
+
             return $cached;
         }
+        RequestTelemetry::recordCache('admin.cms.wizard', 'miss');
 
         $config = $this->object('/cms/wizard/config', $bearerToken);
         $blockTypes = $this->items('/cms/block-types?limit=200&is_active=1', $bearerToken);
