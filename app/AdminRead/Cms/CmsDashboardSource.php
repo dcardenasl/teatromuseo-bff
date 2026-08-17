@@ -34,147 +34,131 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
     {
         $allowed = array_merge(
             array_column(self::COUNT_RESOURCES, 'permission'),
-            ['cms.submissions.read']
+            ['cms.submissions.read'],
         );
         if (array_intersect($allowed, $permissions) === []) {
             return ['sections' => ['counts' => []]];
         }
 
-        $pages = in_array('cms.pages.read', $permissions, true)
-            ? $this->recentRows('cms_pages', 'id, updated_at', true, 'CMS pages')
-            : [];
-        $entries = in_array('cms.entries.read', $permissions, true)
-            ? $this->recentRows('cms_entries', 'id, updated_at', true, 'CMS entries')
-            : [];
-
-        $counts = [];
-        foreach (self::COUNT_RESOURCES as $key => $resource) {
+        $branches = [];
+        foreach (self::COUNT_RESOURCES as $type => $resource) {
             if (! in_array($resource['permission'], $permissions, true)) {
                 continue;
             }
 
-            $builder = $this->db->table($resource['table']);
-            if ($resource['soft_delete']) {
-                $builder->where('deleted_at', null);
+            $where = $resource['soft_delete'] ? ' WHERE deleted_at IS NULL' : '';
+            $branches[] = sprintf(
+                "SELECT 'count' AS row_type, '%s' AS resource, NULL AS item_type,
+                        NULL AS item_id, NULL AS updated_at, NULL AS language_id,
+                        NULL AS title, NULL AS slug, COUNT(*) AS total,
+                        NULL AS submission_status
+                 FROM %s%s",
+                $type,
+                $resource['table'],
+                $where,
+            );
+        }
+
+        if (in_array('cms.pages.read', $permissions, true)) {
+            $branches[] = <<<'SQL'
+                SELECT 'activity' AS row_type, 'pages' AS resource, 'page' AS item_type,
+                       recent_pages.id AS item_id, recent_pages.updated_at,
+                       translations.language_id, translations.title, translations.slug,
+                       NULL AS total, NULL AS submission_status
+                FROM (
+                    SELECT id, updated_at
+                    FROM cms_pages
+                    WHERE deleted_at IS NULL
+                    ORDER BY updated_at DESC
+                    LIMIT 5
+                ) recent_pages
+                LEFT JOIN cms_page_translations translations
+                    ON translations.page_id = recent_pages.id
+                SQL;
+        }
+
+        if (in_array('cms.entries.read', $permissions, true)) {
+            $branches[] = <<<'SQL'
+                SELECT 'activity' AS row_type, 'entries' AS resource, 'entry' AS item_type,
+                       recent_entries.id AS item_id, recent_entries.updated_at,
+                       translations.language_id, translations.title, translations.slug,
+                       NULL AS total, NULL AS submission_status
+                FROM (
+                    SELECT id, updated_at
+                    FROM cms_entries
+                    WHERE deleted_at IS NULL
+                    ORDER BY updated_at DESC
+                    LIMIT 5
+                ) recent_entries
+                LEFT JOIN cms_entry_translations translations
+                    ON translations.entry_id = recent_entries.id
+                SQL;
+        }
+
+        if (in_array('cms.submissions.read', $permissions, true)) {
+            $branches[] = <<<'SQL'
+                SELECT 'submission' AS row_type, 'submissions' AS resource, NULL AS item_type,
+                       NULL AS item_id, NULL AS updated_at, NULL AS language_id,
+                       NULL AS title, NULL AS slug, COUNT(*) AS total, status AS submission_status
+                FROM cms_form_submissions
+                GROUP BY status
+                SQL;
+        }
+
+        $rows = ReadOnlyQuery::sql(
+            $this->db,
+            'SELECT row_type, resource, item_type, item_id, updated_at, language_id,
+                    title, slug, total, submission_status
+             FROM (' . implode("\nUNION ALL\n", $branches) . ') dashboard_rows
+             ORDER BY CASE WHEN row_type = \'activity\' THEN updated_at ELSE NULL END DESC',
+            [],
+            'CMS dashboard projection',
+        );
+
+        $counts = [];
+        $submissions = ['new' => 0, 'read' => 0, 'replied' => 0, 'spam' => 0, 'archived' => 0];
+        $activity = [];
+        foreach ($rows as $row) {
+            $rowType = (string) ($row['row_type'] ?? '');
+            if ($rowType === 'count') {
+                $counts[(string) ($row['resource'] ?? '')] = (int) ($row['total'] ?? 0);
+                continue;
             }
-            $counts[$key] = ReadOnlyQuery::count($builder, 'CMS ' . $key);
+
+            if ($rowType === 'submission') {
+                $submissions[(string) ($row['submission_status'] ?? '')] = (int) ($row['total'] ?? 0);
+                continue;
+            }
+
+            $type = (string) ($row['item_type'] ?? '');
+            $id = (int) ($row['item_id'] ?? 0);
+            $key = $type . ':' . $id;
+            if (! isset($activity[$key])) {
+                $activity[$key] = [
+                    'type' => $type,
+                    'id' => $id,
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                    'translations' => [],
+                ];
+            }
+
+            if ($row['language_id'] !== null) {
+                $activity[$key]['translations'][] = [
+                    'language_id' => (int) $row['language_id'],
+                    'title' => (string) ($row['title'] ?? ''),
+                    'slug' => (string) ($row['slug'] ?? ''),
+                ];
+            }
         }
 
         $sections = ['counts' => $counts];
         if (in_array('cms.submissions.read', $permissions, true)) {
-            $sections['submissions'] = $this->submissionCounts();
+            $sections['submissions'] = $submissions;
         }
-        if ($pages !== [] || $entries !== []) {
-            $sections['recent_activity'] = $this->recentActivity($pages, $entries);
+        if ($activity !== []) {
+            $sections['recent_activity'] = array_values(array_slice($activity, 0, 6));
         }
 
         return ['sections' => $sections];
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function recentRows(string $table, string $projection, bool $softDelete, string $label): array
-    {
-        $builder = $this->db->table($table)->select($projection)->orderBy('updated_at', 'DESC')->limit(5);
-        if ($softDelete) {
-            $builder->where('deleted_at', null);
-        }
-
-        return ReadOnlyQuery::rows($builder, $label);
-    }
-
-    /** @return array<string, int> */
-    private function submissionCounts(): array
-    {
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('cms_form_submissions')
-                ->select('status, COUNT(*) AS total', false)
-                ->groupBy('status'),
-            'CMS form submissions'
-        );
-        $counts = ['new' => 0, 'read' => 0, 'replied' => 0, 'spam' => 0, 'archived' => 0];
-        foreach ($rows as $row) {
-            $counts[(string) ($row['status'] ?? '')] = (int) ($row['total'] ?? 0);
-        }
-
-        return $counts;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $pages
-     * @param list<array<string, mixed>> $entries
-     * @return list<array<string, mixed>>
-     */
-    private function recentActivity(array $pages, array $entries): array
-    {
-        $items = [];
-        $pageIds = $this->ids($pages);
-        $entryIds = $this->ids($entries);
-
-        $pageTranslations = $this->translations('cms_page_translations', 'page_id', $pageIds, 'CMS page translations');
-        $entryTranslations = $this->translations('cms_entry_translations', 'entry_id', $entryIds, 'CMS entry translations');
-
-        foreach ($pages as $page) {
-            $id = (int) ($page['id'] ?? 0);
-            $items[] = [
-                'type' => 'page',
-                'id' => $id,
-                'updated_at' => (string) ($page['updated_at'] ?? ''),
-                'translations' => $pageTranslations[$id] ?? [],
-            ];
-        }
-        foreach ($entries as $entry) {
-            $id = (int) ($entry['id'] ?? 0);
-            $items[] = [
-                'type' => 'entry',
-                'id' => $id,
-                'updated_at' => (string) ($entry['updated_at'] ?? ''),
-                'translations' => $entryTranslations[$id] ?? [],
-            ];
-        }
-
-        usort(
-            $items,
-            static fn (array $left, array $right): int => strcmp(
-                (string) ($right['updated_at'] ?? ''),
-                (string) ($left['updated_at'] ?? '')
-            )
-        );
-
-        return array_slice($items, 0, 6);
-    }
-
-    /** @param list<array<string, mixed>> $rows @return list<int> */
-    private function ids(array $rows): array
-    {
-        return array_values(array_filter(
-            array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows),
-            static fn (int $id): bool => $id > 0
-        ));
-    }
-
-    /** @param list<int> $ids @return array<int, list<array<string, mixed>>> */
-    private function translations(string $table, string $foreignKey, array $ids, string $label): array
-    {
-        if ($ids === []) {
-            return [];
-        }
-
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table($table)
-                ->select($foreignKey . ', language_id, title, slug')
-                ->whereIn($foreignKey, $ids),
-            $label
-        );
-        $grouped = [];
-        foreach ($rows as $row) {
-            $ownerId = (int) ($row[$foreignKey] ?? 0);
-            $grouped[$ownerId][] = [
-                'language_id' => (int) ($row['language_id'] ?? 0),
-                'title' => (string) ($row['title'] ?? ''),
-                'slug' => (string) ($row['slug'] ?? ''),
-            ];
-        }
-
-        return $grouped;
     }
 }
