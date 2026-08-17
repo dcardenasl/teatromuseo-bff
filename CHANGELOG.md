@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`app/AdminRead/**` dashboard/analytics sources** — Catalog, Event, CMS dashboard and
+  CMS analytics projections now issue one bounded SQL query per source (UNION ALL / CTE
+  with database-side aggregation) instead of one query per resource followed by PHP-side
+  merging and sorting. Response shape is unchanged. Codified as the BFF's "SQL-first"
+  fundamental query rule in `CLAUDE.md`/`AGENTS.md`/`CONTEXT.md`/`docs/architecture/BFF_OVERVIEW.md`.
 - **Runtime dependency** — upgraded `dcardenasl/ci4-api-core` to `v1.1.1`.
 - **Local deployment hygiene** — ignored local `.deploy` tooling so deployment helpers are not
   accidentally included in the BFF source tree.
