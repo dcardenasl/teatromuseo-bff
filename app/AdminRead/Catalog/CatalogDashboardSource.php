@@ -11,25 +11,25 @@ use CodeIgniter\Database\BaseConnection;
 /** Permission-aware Catalog dashboard projection over the Catalog database. */
 final class CatalogDashboardSource implements AdminDashboardSourceInterface
 {
-    /** @var array<string, array{table: string, permission: string, projection: string, soft_delete: bool}> */
+    /** @var array<string, array{table: string, permission: string, soft_delete: bool, slug: bool}> */
     private const RESOURCES = [
         'collection_items' => [
             'table' => 'collection_items',
             'permission' => 'catalog.collectionItem.read',
-            'projection' => 'id, name, updated_at',
             'soft_delete' => true,
+            'slug' => false,
         ],
         'categories' => [
             'table' => 'categories',
             'permission' => 'catalog.category.read',
-            'projection' => 'id, name, slug, updated_at',
             'soft_delete' => true,
+            'slug' => true,
         ],
         'techniques' => [
             'table' => 'techniques',
             'permission' => 'catalog.technique.read',
-            'projection' => 'id, name, slug, updated_at',
             'soft_delete' => true,
+            'slug' => true,
         ],
     ];
 
@@ -43,63 +43,74 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
      */
     public function read(array $permissions): array
     {
-        $knownPermissions = array_column(self::RESOURCES, 'permission');
-        if (array_intersect($knownPermissions, $permissions) === []) {
-            return ['sections' => ['counts' => []]];
-        }
-
-        $counts = [];
-        $activity = [];
+        $branches = [];
         foreach (self::RESOURCES as $type => $resource) {
             if (! in_array($resource['permission'], $permissions, true)) {
                 continue;
             }
 
-            $builder = $this->db->table($resource['table']);
-            if ($resource['soft_delete']) {
-                $builder->where('deleted_at', null);
-            }
-            $counts[$type] = ReadOnlyQuery::count($builder, 'Catalog ' . $type);
-            $activity = array_merge($activity, $this->recent($resource, $type));
+            $where = $resource['soft_delete'] ? ' WHERE deleted_at IS NULL' : '';
+            $branches[] = sprintf(
+                "SELECT 'count' AS row_type, '%s' AS resource, NULL AS item_id,
+                        NULL AS item_title, NULL AS item_slug, NULL AS updated_at,
+                        COUNT(*) AS total
+                 FROM %s%s",
+                $type,
+                $resource['table'],
+                $where,
+            );
+
+            $slug = $resource['slug'] ? 'slug' : 'NULL';
+            $branches[] = sprintf(
+                "SELECT 'activity' AS row_type, '%s' AS resource, id AS item_id,
+                        name AS item_title, slug AS item_slug, updated_at, NULL AS total
+                 FROM (
+                     SELECT id, name, %s AS slug, updated_at
+                     FROM %s%s
+                     ORDER BY updated_at DESC
+                     LIMIT 5
+                 ) recent_%s",
+                $type,
+                $slug,
+                $resource['table'],
+                $where,
+                $type,
+            );
         }
 
-        usort(
-            $activity,
-            static fn (array $left, array $right): int => strcmp(
-                (string) ($right['updated_at'] ?? ''),
-                (string) ($left['updated_at'] ?? '')
-            )
+        if ($branches === []) {
+            return ['sections' => ['counts' => []]];
+        }
+
+        $rows = ReadOnlyQuery::sql(
+            $this->db,
+            'SELECT row_type, resource, item_id, item_title, item_slug, updated_at, total
+             FROM (' . implode("\nUNION ALL\n", $branches) . ') dashboard_rows
+             ORDER BY CASE WHEN row_type = \'activity\' THEN updated_at ELSE NULL END DESC',
+            [],
+            'Catalog dashboard projection',
         );
+
+        $counts = [];
+        $activity = [];
+        foreach ($rows as $row) {
+            if (($row['row_type'] ?? '') === 'count') {
+                $counts[(string) ($row['resource'] ?? '')] = (int) ($row['total'] ?? 0);
+                continue;
+            }
+
+            $activity[] = [
+                'type' => (string) ($row['resource'] ?? ''),
+                'id' => (int) ($row['item_id'] ?? 0),
+                'title' => trim((string) ($row['item_title'] ?? '')),
+                'slug' => trim((string) ($row['item_slug'] ?? '')),
+                'updated_at' => (string) ($row['updated_at'] ?? ''),
+            ];
+        }
 
         return ['sections' => [
             'counts' => $counts,
             'recent_activity' => array_slice($activity, 0, 6),
         ]];
-    }
-
-    /** @param array{table: string, permission: string, projection: string, soft_delete: bool} $resource */
-    private function recent(array $resource, string $type): array
-    {
-        $builder = $this->db->table($resource['table'])
-            ->select($resource['projection'])
-            ->orderBy('updated_at', 'DESC')
-            ->limit(5);
-        if ($resource['soft_delete']) {
-            $builder->where('deleted_at', null);
-        }
-
-        $rows = ReadOnlyQuery::rows($builder, 'Catalog ' . $type . ' activity');
-        $items = [];
-        foreach ($rows as $row) {
-            $items[] = [
-                'type' => $type,
-                'id' => (int) ($row['id'] ?? 0),
-                'title' => trim((string) ($row['name'] ?? '')),
-                'slug' => trim((string) ($row['slug'] ?? '')),
-                'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ];
-        }
-
-        return $items;
     }
 }
