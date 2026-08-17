@@ -410,10 +410,13 @@ comenzar su mitad (`ADM-BFF-05/06`).
   explícitas con límite 100 y cache de 30 s por contexto + scope de permisos;
   las pruebas unitarias cubren permiso, contexto y cache.
 
-- [ ] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
-  🔴 En progreso. Enum cerrado de `context`, filtro `introspectauth` por ser
-  una lectura exclusiva del Event domain; tests de contexto inválido, permiso,
-  catálogo vacío (distinto de fuente no disponible) y fuente caída.
+- [x] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
+  Cerrada 2026-08-17. El endpoint usa `introspectauth` por ser una lectura
+  exclusiva del Event domain, publica estado `event:ok`, distingue catálogo
+  vacío de fuente caída y cubre 401/403/422/503; `php spark routes` y
+  `composer quality` quedaron verdes (225 tests, 740 assertions, 1 skipped,
+  2 deprecations). El smoke HTTP con bearer se intentó contra
+  `localhost:8188`, pero el entorno no tenía el proceso local accesible.
 
 **Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
 
