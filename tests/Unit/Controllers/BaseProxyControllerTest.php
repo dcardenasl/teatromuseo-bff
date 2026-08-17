@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Controllers;
 
 use App\Controllers\BaseProxyController;
+use App\Support\RequestTelemetry;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Services;
@@ -70,6 +71,26 @@ final class BaseProxyControllerTest extends CIUnitTestCase
         $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $body['data']['hub']);
         $this->assertSame(['state' => 'unavailable', 'data' => []], $body['data']['cms']);
         $this->assertSame(['state' => 'ok', 'data' => ['events' => 2]], $body['data']['event']);
+    }
+
+    public function testAggregatePartialRecordsSourceOutcomesWhenTelemetryIsActive(): void
+    {
+        RequestTelemetry::begin('request-789');
+
+        $this->runAggregatePartial([
+            'hub' => static fn (): array => ['users' => 4],
+            'cms' => static function (): array {
+                throw new RuntimeException('cms unavailable');
+            },
+        ]);
+
+        $summary = RequestTelemetry::sourceSummary();
+        RequestTelemetry::reset();
+
+        $this->assertSame(2, $summary['count']);
+        $this->assertSame(['ok' => 1, 'unavailable' => 1], $summary['states']);
+        $this->assertSame('hub', $summary['events'][0]['source']);
+        $this->assertSame('unavailable', $summary['events'][1]['state']);
     }
 
     /**

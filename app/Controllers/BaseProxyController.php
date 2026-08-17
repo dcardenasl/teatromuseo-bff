@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Support\RequestTelemetry;
 use CodeIgniter\Controller;
 use CodeIgniter\HTTP\IncomingRequest;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -91,7 +92,17 @@ abstract class BaseProxyController extends Controller
         try {
             $data = [];
             foreach ($calls as $key => $call) {
-                $data[$key] = $call();
+                $startedAt = hrtime(true);
+                try {
+                    $data[$key] = $call();
+                    RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'ok', 200);
+                } catch (ApiException $exception) {
+                    RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'unavailable', $exception->getStatusCode());
+                    throw $exception;
+                } catch (Throwable $exception) {
+                    RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'unavailable', 500);
+                    throw $exception;
+                }
             }
 
             return $this->response->setJSON(ApiResponse::success($data));
@@ -135,12 +146,16 @@ abstract class BaseProxyController extends Controller
         $data = [];
 
         foreach ($calls as $key => $call) {
+            $startedAt = hrtime(true);
             try {
                 $data[$key] = [
                     'state' => 'ok',
                     'data'  => $call(),
                 ];
+                RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'ok', 200);
             } catch (Throwable $exception) {
+                $status = $exception instanceof ApiException ? $exception->getStatusCode() : 500;
+                RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'unavailable', $status);
                 log_message('error', sprintf(
                     'Partial aggregate source "%s" unavailable: %s: %s',
                     $key,
@@ -177,11 +192,23 @@ abstract class BaseProxyController extends Controller
      */
     protected function handleOperation(callable $operation, string $source): ResponseInterface
     {
+        $startedAt = hrtime(true);
         try {
-            return $operation();
+            $response = $operation();
+            $status = $response->getStatusCode();
+            RequestTelemetry::recordSource(
+                $source,
+                $this->elapsedSince($startedAt),
+                $status >= 400 ? 'unavailable' : 'ok',
+                $status,
+            );
+
+            return $response;
         } catch (ApiException $exception) {
+            RequestTelemetry::recordSource($source, $this->elapsedSince($startedAt), 'unavailable', $exception->getStatusCode());
             return $this->respondWithException($exception);
         } catch (Throwable $exception) {
+            RequestTelemetry::recordSource($source, $this->elapsedSince($startedAt), 'unavailable', 503);
             log_message('error', sprintf(
                 '%s unavailable: %s: %s',
                 $source,
@@ -193,5 +220,10 @@ abstract class BaseProxyController extends Controller
                 $source . ' unavailable.',
             ));
         }
+    }
+
+    private function elapsedSince(int $startedAt): float
+    {
+        return (hrtime(true) - $startedAt) / 1_000_000;
     }
 }
