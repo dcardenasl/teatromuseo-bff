@@ -211,6 +211,15 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::eventLookups();
     }
 
+    public static function adminReadCmsBootstrap(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsBootstrapSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsBootstrap');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsBootstrap();
+    }
+
     public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
     {
         if ($getShared) {

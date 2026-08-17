@@ -33,3 +33,39 @@ $routes->get(
     '\App\Controllers\Api\V1\Me\AdminEventLookupsController::index/$1',
     ['filter' => 'effectivepermissionsauth'],
 );
+
+$routes->get(
+    'me/admin-cms/entry-form-options',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::entryFormOptions',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/entry-form-options/(:num)',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::entryFormOptions/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/page-form-options',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::pageFormOptions',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/page-form-options/(:num)',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::pageFormOptions/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/menus/(:num)/editor-bootstrap',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::menuEditorBootstrap/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/menus/(:num)/editor-bootstrap/(:num)',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::menuEditorBootstrap/$1/$2',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/site-identity-bootstrap',
+    '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::siteIdentityBootstrap',
+    ['filter' => 'effectivepermissionsauth'],
+);

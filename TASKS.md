@@ -424,14 +424,17 @@ comenzar su mitad (`ADM-BFF-05/06`).
 
 **Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
 
-- [ ] **BFF-ADMINREAD-14 — Medición Fase 0 de las pantallas candidatas.**
-  Intentada 2026-08-17; queda pendiente por bloqueo de entorno. Se preparó la
-  tabla de línea base en §13 del plan y se verificó el rastro de llamadas en
-  código, pero el método runtime no pudo ejecutarse: Admin `8182` y BFF `8188`
-  rechazaron conexión (código 000), por lo que no existen latencias ni
-  payloads medidos que permitan aplicar el umbral de §7. No se aprueba ni se
-  crea ninguna proyección CMS; `ADM-BFF-10` permanece pendiente hasta repetir
-  la medición con el stack accesible.
+- [x] **BFF-ADMINREAD-14 — Medición Fase 0 de las pantallas candidatas.**
+  Cerrada 2026-08-17 tras corregir la colisión local que había desplazado CMS
+  desde `8190`; la medición runtime válida y las decisiones están en §13 del
+  plan raíz.
+
+- [x] **BFF-ADMINREAD-15 — Bootstraps CMS aprobados.**
+  Cerrada 2026-08-17. Se agregaron las proyecciones autenticadas
+  `entry-form-options`, `page-form-options`, `menu-editor-bootstrap` y
+  `site-identity-bootstrap`, con permisos efectivos, caché corto por scope,
+  pruebas de endpoint y pruebas unitarias de composición. BlockInstance y
+  Wizard quedan explícitamente diferidos.
 
 ### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AdminRead;
 
 use App\AdminRead\Catalog\CatalogDashboardSource;
+use App\AdminRead\Cms\AdminCmsBootstrapSource;
 use App\AdminRead\Cms\CmsAnalyticsDashboardSource;
 use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
@@ -73,6 +74,14 @@ final class AdminReadContainer
     {
         return new AdminEventLookupSource(
             self::database('event_readonly'),
+            \Config\Services::cache(),
+        );
+    }
+
+    public static function cmsBootstrap(): AdminCmsBootstrapSource
+    {
+        return new AdminCmsBootstrapSource(
+            \Config\Services::domainClient('cms'),
             \Config\Services::cache(),
         );
     }
