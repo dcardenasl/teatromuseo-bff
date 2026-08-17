@@ -421,14 +421,13 @@ comenzar su mitad (`ADM-BFF-05/06`).
 **Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
 
 - [ ] **BFF-ADMINREAD-14 — Medición Fase 0 de las pantallas candidatas.**
-  Entry, Page, Menu, BlockInstance, Wizard, SiteIdentity: contar llamadas,
-  tiempo y payload en cache-miss con el mismo método que produjo los números
-  del dashboard (§3.1 del plan); registrar la tabla en el plan; aplicar el
-  umbral fijado en §7 (≥3 llamadas o ~150 ms) para decidir qué proyecciones
-  de `entry-form-options`/`page-form-options`/`menu-editor-bootstrap`/
-  `block-editor-bootstrap`/`wizard-bootstrap` se construyen. Las
-  proyecciones aprobadas se registran como tareas nuevas recién en ese
-  momento — no se numeran de antemano.
+  Intentada 2026-08-17; queda pendiente por bloqueo de entorno. Se preparó la
+  tabla de línea base en §13 del plan y se verificó el rastro de llamadas en
+  código, pero el método runtime no pudo ejecutarse: Admin `8182` y BFF `8188`
+  rechazaron conexión (código 000), por lo que no existen latencias ni
+  payloads medidos que permitan aplicar el umbral de §7. No se aprueba ni se
+  crea ninguna proyección CMS; `ADM-BFF-10` permanece pendiente hasta repetir
+  la medición con el stack accesible.
 
 ### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 
