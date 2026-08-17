@@ -11,74 +11,16 @@ use CodeIgniter\Database\BaseConnection;
 /** Permission-aware Event dashboard projection over the Event database. */
 final class EventDashboardSource implements AdminDashboardSourceInterface
 {
-    /** @var array<string, array{table: string, permission: string, projection: string, title: string, soft_delete: bool, activity: bool}> */
+    /** @var array<string, array{table: string, permission: string, title: string, activity: bool, soft_delete: bool}> */
     private const RESOURCES = [
-        'events' => [
-            'table' => 'events',
-            'permission' => 'event.events.read',
-            'projection' => 'id, title, updated_at',
-            'title' => 'title',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'event_types' => [
-            'table' => 'event_types',
-            'permission' => 'event.event-types.read',
-            'projection' => 'id, name, slug, updated_at',
-            'title' => 'name',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'venues' => [
-            'table' => 'venues',
-            'permission' => 'event.venues.read',
-            'projection' => 'id, name, slug, updated_at',
-            'title' => 'name',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'occurrences' => [
-            'table' => 'occurrences',
-            'permission' => 'event.occurrences.read',
-            'projection' => 'id, status, updated_at',
-            'title' => 'status',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'event_references' => [
-            'table' => 'event_references',
-            'permission' => 'event.event-references.read',
-            // Event references are count-only in the domain contract and do
-            // not have a `name` column in their owned schema.
-            'projection' => 'id, updated_at',
-            'title' => '',
-            'soft_delete' => true,
-            'activity' => false,
-        ],
-        'ticket_types' => [
-            'table' => 'ticket_types',
-            'permission' => 'event.ticket-types.read',
-            'projection' => 'id, name, updated_at',
-            'title' => 'name',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'bookings' => [
-            'table' => 'bookings',
-            'permission' => 'event.bookings.read',
-            'projection' => 'id, status, updated_at',
-            'title' => 'status',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
-        'tickets' => [
-            'table' => 'tickets',
-            'permission' => 'event.tickets.read',
-            'projection' => 'id, holder_name, status, updated_at',
-            'title' => 'holder_name',
-            'soft_delete' => true,
-            'activity' => true,
-        ],
+        'events' => ['table' => 'events', 'permission' => 'event.events.read', 'title' => 'title', 'activity' => true, 'soft_delete' => true],
+        'event_types' => ['table' => 'event_types', 'permission' => 'event.event-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+        'venues' => ['table' => 'venues', 'permission' => 'event.venues.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+        'occurrences' => ['table' => 'occurrences', 'permission' => 'event.occurrences.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
+        'event_references' => ['table' => 'event_references', 'permission' => 'event.event-references.read', 'title' => '', 'activity' => false, 'soft_delete' => true],
+        'ticket_types' => ['table' => 'ticket_types', 'permission' => 'event.ticket-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+        'bookings' => ['table' => 'bookings', 'permission' => 'event.bookings.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
+        'tickets' => ['table' => 'tickets', 'permission' => 'event.tickets.read', 'title' => 'holder_name', 'activity' => true, 'soft_delete' => true],
     ];
 
     public function __construct(private readonly BaseConnection $db)
@@ -91,64 +33,75 @@ final class EventDashboardSource implements AdminDashboardSourceInterface
      */
     public function read(array $permissions): array
     {
-        $knownPermissions = array_column(self::RESOURCES, 'permission');
-        if (array_intersect($knownPermissions, $permissions) === []) {
-            return ['sections' => ['counts' => []]];
-        }
-
-        $counts = [];
-        $activity = [];
+        $branches = [];
         foreach (self::RESOURCES as $type => $resource) {
             if (! in_array($resource['permission'], $permissions, true)) {
                 continue;
             }
 
-            $builder = $this->db->table($resource['table']);
-            if ($resource['soft_delete']) {
-                $builder->where('deleted_at', null);
+            $where = $resource['soft_delete'] ? ' WHERE deleted_at IS NULL' : '';
+            $branches[] = sprintf(
+                "SELECT 'count' AS row_type, '%s' AS resource, NULL AS item_id,
+                        NULL AS item_title, NULL AS updated_at, COUNT(*) AS total
+                 FROM %s%s",
+                $type,
+                $resource['table'],
+                $where,
+            );
+
+            if (! $resource['activity']) {
+                continue;
             }
-            $counts[$type] = ReadOnlyQuery::count($builder, 'Event ' . $type);
-            if ($resource['activity']) {
-                $activity = array_merge($activity, $this->recent($resource, $type));
-            }
+
+            $branches[] = sprintf(
+                "SELECT 'activity' AS row_type, '%s' AS resource, id AS item_id,
+                        item_title, updated_at, NULL AS total
+                 FROM (
+                     SELECT id, %s AS item_title, updated_at
+                     FROM %s%s
+                     ORDER BY updated_at DESC
+                     LIMIT 5
+                 ) recent_%s",
+                $type,
+                $resource['title'],
+                $resource['table'],
+                $where,
+                $type,
+            );
         }
 
-        usort(
-            $activity,
-            static fn (array $left, array $right): int => strcmp(
-                (string) ($right['updated_at'] ?? ''),
-                (string) ($left['updated_at'] ?? '')
-            )
+        if ($branches === []) {
+            return ['sections' => ['counts' => []]];
+        }
+
+        $rows = ReadOnlyQuery::sql(
+            $this->db,
+            'SELECT row_type, resource, item_id, item_title, updated_at, total
+             FROM (' . implode("\nUNION ALL\n", $branches) . ') dashboard_rows
+             ORDER BY CASE WHEN row_type = \'activity\' THEN updated_at ELSE NULL END DESC',
+            [],
+            'Event dashboard projection',
         );
+
+        $counts = [];
+        $activity = [];
+        foreach ($rows as $row) {
+            if (($row['row_type'] ?? '') === 'count') {
+                $counts[(string) ($row['resource'] ?? '')] = (int) ($row['total'] ?? 0);
+                continue;
+            }
+
+            $activity[] = [
+                'type' => (string) ($row['resource'] ?? ''),
+                'id' => (int) ($row['item_id'] ?? 0),
+                'title' => trim((string) ($row['item_title'] ?? '')),
+                'updated_at' => (string) ($row['updated_at'] ?? ''),
+            ];
+        }
 
         return ['sections' => [
             'counts' => $counts,
             'recent_activity' => array_slice($activity, 0, 6),
         ]];
-    }
-
-    /** @param array{table: string, permission: string, projection: string, title: string, soft_delete: bool, activity: bool} $resource */
-    private function recent(array $resource, string $type): array
-    {
-        $builder = $this->db->table($resource['table'])
-            ->select($resource['projection'])
-            ->orderBy('updated_at', 'DESC')
-            ->limit(5);
-        if ($resource['soft_delete']) {
-            $builder->where('deleted_at', null);
-        }
-
-        $rows = ReadOnlyQuery::rows($builder, 'Event ' . $type . ' activity');
-        $items = [];
-        foreach ($rows as $row) {
-            $items[] = [
-                'type' => $type,
-                'id' => (int) ($row['id'] ?? 0),
-                'title' => trim((string) ($row[$resource['title']] ?? '')),
-                'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ];
-        }
-
-        return $items;
     }
 }
