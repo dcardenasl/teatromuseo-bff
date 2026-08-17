@@ -437,6 +437,14 @@ comenzar su mitad (`ADM-BFF-05/06`).
   de endpoint y pruebas unitarias de composición. BlockInstance comparte el
   workspace para páginas y entradas; Wizard usa su propio bundle.
 
+- [x] **BFF-OBS-01 — Telemetría operacional de lecturas compuestas.** Cerrada
+  2026-08-17. El BFF registra request id, ruta, estado, duración, bytes,
+  errores y estado de cada fuente; los lectores Admin añaden hit/miss de caché
+  sin registrar payloads, tokens ni datos sensibles. Incluye filtro global,
+  instrumentación de proxies y `page-resolve`, regresiones unitarias y
+  `composer quality` verde (241 tests, 819 aserciones, 1 skip; 2
+  deprecations preexistentes).
+
 ### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 
 El BFF ahora expone `/api/v1/me/admin-dashboard` como consumidor real del
