@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AdminRead\Support;
 
 use CodeIgniter\Database\BaseBuilder;
+use CodeIgniter\Database\BaseConnection;
 use RuntimeException;
 
 /**
@@ -37,5 +38,23 @@ final class ReadOnlyQuery
         }
 
         return (int) $rows[0]['total'];
+    }
+
+    /**
+     * Execute one bounded SQL projection and fail closed on schema/database
+     * errors. Table names passed to this helper must come from source-owned
+     * constants; values belong in the bindings array.
+     *
+     * @param list<mixed> $bindings
+     * @return list<array<string, mixed>>
+     */
+    public static function sql(BaseConnection $db, string $sql, array $bindings, string $label): array
+    {
+        $result = $db->query($sql, $bindings);
+        if ($result === false) {
+            throw new RuntimeException(sprintf('Admin dashboard query failed for %s.', $label));
+        }
+
+        return array_values($result->getResultArray());
     }
 }
