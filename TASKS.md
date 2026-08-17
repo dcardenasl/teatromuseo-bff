@@ -106,6 +106,12 @@
   `composer test:unit` (155 tests / 464 asserts), `composer quality` (198 /
   614), `php spark routes` y smoke local de `/health` pasaron.
 
+- [x] **BFF-ADMINREAD-15 — Contexto de permisos efectivos para Admin.** Cerrada
+  2026-08-16. `/me/admin-dashboard` usa el contexto canónico de Hub
+  `/auth/me` mediante un filtro dedicado, mantiene la `hub.apiKey` propia del
+  BFF y entrega permisos cross-app sin duplicarlos; verificado con tests del
+  cliente, endpoint, regresión de `/me/dashboard` y `composer quality`.
+
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
   2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
   sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
@@ -318,6 +324,91 @@
 _(sin tareas en curso)_
 
 ## 🟡 Próximo
+
+### Lecturas compuestas del Admin vía BFF (2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-lecturas-compuestas-via-bff.md`
+
+Extiende el seam `AdminRead` ya usado por `/me/admin-dashboard`
+(`BFF-ADMINREAD-01..04`, cerradas) a otras pantallas del Admin con fan-out
+real: widgets de dashboard restantes, Analytics, usos de archivos y lookups
+de formularios de Event. CMS bootstrap (Fase 5) queda condicionado a
+medición — solo se registra aquí la tarea de medición, no las proyecciones
+resultantes. Fuente arquitectónica: ADR-010. Cada tarea se ejecuta solo tras
+mover su feature a `🔴 En progreso` y con el BFF verificado antes de que
+Admin empiece a consumirla (el Admin no arranca su mitad hasta que la mitad
+del BFF de la misma feature esté cerrada, igual que en `BFF-DASH`/
+`ADM-DASH`).
+
+**Feature 1 — Dashboard: widgets de analytics y traducciones completos**
+
+- [ ] **BFF-ADMINREAD-05 — Lector de analytics + adaptación de traducciones.**
+  `CmsAnalyticsDashboardSource` bajo `app/AdminRead/Cms/` con proyección
+  acotada a 7 días sobre `page_views`; para `translations`, una única
+  llamada BFF→CMS que reutiliza el algoritmo existente de auditoría (no se
+  porta ese algoritmo al BFF). Valida `cms.analytics.read`/
+  `cms.languages.read` antes de consultar.
+- [ ] **BFF-ADMINREAD-06 — Extender `/me/admin-dashboard`.** Nuevas
+  secciones versionadas `analytics`/`translations` con estado de fuente
+  independiente, sin perder el contrato `sections/source.state` existente;
+  tests de contrato, permiso y degradación parcial; `composer quality`,
+  `php spark routes`, smoke HTTP autenticado.
+
+**Feature 2 — Analytics administrativo compuesto**
+
+- [ ] **BFF-ADMINREAD-07 — `CmsAnalyticsSource` completa.** Overview, pages,
+  referrers, devices, timeseries en una sola proyección; enum cerrado de
+  `period` (`1h|24h|7d|30d`), límites fijos server-side (no enviados por el
+  cliente); `EXPLAIN` sobre volumen representativo antes de decidir si hace
+  falta un índice nuevo (la migración, si hiciera falta, es de
+  `teatromuseo-cms-domain`, no del BFF).
+- [ ] **BFF-ADMINREAD-08 — `GET /api/v1/me/admin-analytics`.** Controlador +
+  ruta; tests de paridad de payload contra el contrato actual de
+  `AnalyticsApiService`, permiso, periodo inválido y fuente caída;
+  `composer quality`.
+
+**Feature 3 — Usos de archivos cross-domain**
+
+- [ ] **BFF-ADMINREAD-09 — Verificar el alcance real antes de codificar.**
+  Confirmar en código que `DomainFileUsageClient::collectUsages()` del Hub
+  sigue agregando `cms`/`catalog`/`event` vía `internal/files/{id}/usage`, y
+  documentar qué campos de la respuesta directa de CMS (`context` en filas
+  `block_instance`) pierde ese mapeo genérico. Ver el hallazgo completo en
+  §3.2 y ADM-BFF-03 del plan — el diseño de los siguientes dos tickets
+  depende de esta verificación, no la des.
+- [ ] **BFF-ADMINREAD-10 — `AdminFileUsageSource`.** Hub autenticado + CMS
+  `SELECT`-only, deduplicado de forma estable por
+  `(source, resource, resource_id, role)` prefiriendo la variante con
+  `context`; sin stale silencioso (un fallo debe impedir presentar el
+  resultado como completo, porque alimenta decisiones de borrado).
+- [ ] **BFF-ADMINREAD-11 — `GET /api/v1/me/admin-files/{fileId}/usages`.**
+  Controlador dedicado (no reutiliza el agregador del dashboard); tests de
+  archivo con usos reales, archivo sin usos y fuente caída; `composer
+  quality`.
+
+**Feature 4 — Lookups administrativos de Event**
+
+- [ ] **BFF-ADMINREAD-12 — `EventAdminLookupSource`.** Un método/adapter por
+  contexto (`occurrence`, `ticket_type`, `ticket`, `booking`,
+  `event_reference`) según la tabla verificada `context → fuentes` del plan;
+  columnas mínimas para etiquetas de formulario; permisos por recurso
+  aplicados antes de consultar; límite documentado por catálogo (hoy 100 en
+  Admin, no ampliar sin medir); cache corto por contexto + scope de
+  permisos.
+- [ ] **BFF-ADMINREAD-13 — `GET /api/v1/me/admin-event-lookups/{context}`.**
+  Enum cerrado de `context`; tests de contexto inválido, permiso, catálogo
+  vacío (distinto de fuente no disponible) y fuente caída; `composer
+  quality`.
+
+**Feature 5 — Bootstrap de editores CMS (condicionada a medición)**
+
+- [ ] **BFF-ADMINREAD-14 — Medición Fase 0 de las pantallas candidatas.**
+  Entry, Page, Menu, BlockInstance, Wizard, SiteIdentity: contar llamadas,
+  tiempo y payload en cache-miss con el mismo método que produjo los números
+  del dashboard (§3.1 del plan); registrar la tabla en el plan; aplicar el
+  umbral fijado en §7 (≥3 llamadas o ~150 ms) para decidir qué proyecciones
+  de `entry-form-options`/`page-form-options`/`menu-editor-bootstrap`/
+  `block-editor-bootstrap`/`wizard-bootstrap` se construyen. Las
+  proyecciones aprobadas se registran como tareas nuevas recién en ese
+  momento — no se numeran de antemano.
 
 ### Dashboard de Admin como consumidor real del BFF — cerrado 2026-08-16
 
