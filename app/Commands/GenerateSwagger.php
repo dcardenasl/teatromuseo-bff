@@ -22,13 +22,15 @@ class GenerateSwagger extends BaseCommand
             $appPath = APPPATH;
             $outputPath = FCPATH . 'swagger.json';
 
-            // Scan directories for OpenAPI annotations
+            // Scan directories for OpenAPI annotations. The BFF has no
+            // app/DTO/ directory (it's stateless — DTOs it does use live
+            // under app/PublicRead/**), so it isn't scanned here; keep this
+            // list in sync with tests/Feature/Swagger/SwaggerGenerationTest.php.
             $openapi = (new \OpenApi\Generator())
                 ->generate([
                     $appPath . 'Config/OpenApi.php',
                     $appPath . 'Controllers/',
                     $appPath . 'Documentation/',
-                    $appPath . 'DTO/',
                 ]);
 
             // Write to file
