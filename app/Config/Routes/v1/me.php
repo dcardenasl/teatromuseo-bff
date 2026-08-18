@@ -31,7 +31,15 @@ $routes->get(
 $routes->get(
     'me/admin-analytics',
     '\App\Controllers\Api\V1\Me\AdminAnalyticsController::index',
-    ['filter' => 'introspectauth'],
+    // effectivepermissionsauth, not introspectauth: `cms.analytics.read` is
+    // registered under the CMS Domain's application in the Hub, not the
+    // BFF's own. `/auth/introspect` only returns the caller's permission
+    // scope for the BFF's own X-App-Key application, so this permission
+    // would never be present there even for a user who genuinely holds it —
+    // the same real-world 403 that BFF-ADMINREAD-13 found and fixed for
+    // `me/admin-event-lookups`. Every other `admin-*` route already uses
+    // effectivepermissionsauth for this exact reason.
+    ['filter' => 'effectivepermissionsauth'],
 );
 
 $routes->get(

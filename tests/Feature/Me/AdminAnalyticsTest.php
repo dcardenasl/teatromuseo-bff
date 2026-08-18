@@ -38,7 +38,7 @@ final class AdminAnalyticsTest extends ApiTestCase
 
     public function testReturnsCompleteProjectionForRequestedPeriod(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $reader = $this->createMock(AdminAnalyticsSourceInterface::class);
         $reader->expects($this->once())
             ->method('read')
@@ -65,7 +65,7 @@ final class AdminAnalyticsTest extends ApiTestCase
 
     public function testDefaultsToSevenDays(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $reader = $this->createMock(AdminAnalyticsSourceInterface::class);
         $reader->expects($this->once())
             ->method('read')
@@ -82,7 +82,7 @@ final class AdminAnalyticsTest extends ApiTestCase
 
     public function testRejectsUnsupportedPeriodBeforeReadingSource(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $reader = $this->createMock(AdminAnalyticsSourceInterface::class);
         $reader->expects($this->never())->method('read');
         Services::injectMock('adminReadCmsAnalytics', $reader);
@@ -96,7 +96,7 @@ final class AdminAnalyticsTest extends ApiTestCase
 
     public function testReturns403WhenCmsAnalyticsPermissionIsMissing(): void
     {
-        $this->mockHubIntrospection(['dashboard.view']);
+        $this->mockEffectiveUser(['dashboard.view']);
         $reader = $this->createMock(AdminAnalyticsSourceInterface::class);
         $reader->expects($this->once())
             ->method('read')
@@ -113,7 +113,7 @@ final class AdminAnalyticsTest extends ApiTestCase
 
     public function testReturns503WhenCmsAnalyticsSourceFails(): void
     {
-        $this->mockHubIntrospection();
+        $this->mockEffectiveUser();
         $reader = $this->createMock(AdminAnalyticsSourceInterface::class);
         $reader->method('read')->willThrowException(new RuntimeException('database unavailable'));
         Services::injectMock('adminReadCmsAnalytics', $reader);
@@ -127,19 +127,19 @@ final class AdminAnalyticsTest extends ApiTestCase
     }
 
     /** @param list<string>|null $permissions */
-    private function mockHubIntrospection(?array $permissions = null): void
+    private function mockEffectiveUser(?array $permissions = null): void
     {
         $response = $this->jsonResponse(200, [
-            'valid'       => true,
-            'uid'         => 42,
-            'permissions' => $permissions ?? ['cms.analytics.read', 'dashboard.view'],
-            'exp'         => time() + 3600,
+            'data' => [
+                'id'          => 42,
+                'permissions' => $permissions ?? ['cms.analytics.read', 'dashboard.view'],
+            ],
         ]);
         $http = $this->createMock(CURLRequest::class);
         $http->method('request')->willReturn($response);
 
         Services::injectMock('curlrequest', $http);
-        Services::resetSingle('hubClient');
+        Services::resetSingle('hubDashboardClient');
     }
 
     private function permissionScope(): \PHPUnit\Framework\Constraint\Constraint
