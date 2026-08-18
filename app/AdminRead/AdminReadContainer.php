@@ -18,6 +18,7 @@ use App\AdminRead\Event\AdminEventWorkspaceSource;
 use App\AdminRead\Event\EventDashboardSource;
 use App\AdminRead\Files\AdminFileUsageSource;
 use App\AdminRead\Hub\AdminIamRoleWorkspaceSource;
+use App\AdminRead\Hub\AdminMetricsWorkspaceSource;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 
@@ -136,5 +137,10 @@ final class AdminReadContainer
     public static function iamRoleWorkspace(): AdminIamRoleWorkspaceSource
     {
         return new AdminIamRoleWorkspaceSource(\Config\Services::hubDashboardClient());
+    }
+
+    public static function metricsWorkspace(): AdminMetricsWorkspaceSource
+    {
+        return new AdminMetricsWorkspaceSource(\Config\Services::hubDashboardClient());
     }
 }

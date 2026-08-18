@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Controllers\Api\V1\Me;
 
 use App\Controllers\BaseProxyController;
-use App\Libraries\Hub\HubClient;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Services;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthenticationException;
@@ -33,30 +32,13 @@ final class AdminMetricsWorkspaceController extends BaseProxyController
         }
 
         return $this->handleOperation(function () use ($bearer, $period): ResponseInterface {
-            /** @var HubClient $hubClient */
-            $hubClient = Services::hubDashboardClient();
-            $payload = $hubClient->get('/api/v1/admin/metrics/workspace?period=' . rawurlencode($period), $bearer);
-            $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
-            if (is_array($data['data'] ?? null) && ! array_key_exists('summary', $data)) {
-                $data = $data['data'];
-            }
+            $sections = Services::adminReadMetricsWorkspace()->workspace($period, $bearer);
 
             return $this->response->setJSON(ApiResponse::success([
                 'version' => 1,
                 'period' => $period,
-                'summary' => is_array($data['summary'] ?? null) ? $data['summary'] : [],
-                'timeseries' => is_array($data['timeseries'] ?? null) ? $data['timeseries'] : [],
+                ...$sections,
             ]));
         }, 'Hub admin metrics workspace source');
-    }
-
-    private function extractBearerToken(): ?string
-    {
-        $header = $this->request->getHeaderLine('Authorization');
-        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return null;
     }
 }
