@@ -40,8 +40,20 @@ final class AdminCmsWizardSource implements AdminCmsWizardSourceInterface
         }
         RequestTelemetry::recordCache('admin.cms.wizard', 'miss');
 
-        $config = $this->object('/cms/wizard/config', $bearerToken);
-        $blockTypes = $this->items('/cms/block-types?limit=200&is_active=1', $bearerToken);
+        // The CMS wizard endpoint already builds the complete dynamic config,
+        // including the active block type map. Reuse that read-model section
+        // instead of making a second HTTP request to /api/v1/cms/block-types.
+        $config = $this->object('/api/v1/cms/wizard/config', $bearerToken);
+        $blockTypes = [];
+        $blockTypeMap = is_array($config['block_types'] ?? null) ? $config['block_types'] : [];
+        foreach ($blockTypeMap as $blockKey => $blockType) {
+            if (! is_array($blockType)) {
+                continue;
+            }
+
+            $blockType['block_key'] = (string) ($blockType['block_key'] ?? $blockKey);
+            $blockTypes[] = $blockType;
+        }
         $result = [
             'config' => $config,
             'blockTypes' => $blockTypes,
@@ -49,22 +61,6 @@ final class AdminCmsWizardSource implements AdminCmsWizardSourceInterface
         $this->cache->save($cacheKey, $result, self::CACHE_TTL);
 
         return $result;
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function items(string $path, string $bearerToken): array
-    {
-        $payload = $this->payload($this->client->get($path, $bearerToken));
-        if (is_array($payload['items'] ?? null)) {
-            $payload = $payload['items'];
-        } elseif (is_array($payload['data'] ?? null)) {
-            $payload = $payload['data'];
-        }
-        if (! is_array($payload)) {
-            throw new RuntimeException('CMS wizard block type payload is invalid.');
-        }
-
-        return array_values(array_filter($payload, static fn (mixed $item): bool => is_array($item)));
     }
 
     /** @return array<string, mixed> */

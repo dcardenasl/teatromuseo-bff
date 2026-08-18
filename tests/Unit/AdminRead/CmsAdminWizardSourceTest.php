@@ -25,16 +25,26 @@ final class CmsAdminWizardSourceTest extends CIUnitTestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['get'])
             ->getMock();
-        $client->expects($this->exactly(2))
+        $client->expects($this->once())
             ->method('get')
-            ->willReturnOnConsecutiveCalls(
-                ['data' => ['languages' => []]],
-                ['data' => [['id' => 5, 'block_key' => 'rich_text']]],
-            );
+            ->with('/api/v1/cms/wizard/config', 'token')
+            ->willReturn(['data' => [
+                'languages' => [],
+                'block_types' => [
+                    'rich_text' => [
+                        'id' => 5,
+                        'name' => 'Rich Text',
+                        'category' => 'content',
+                        'schema_definition' => ['allowed_children' => ['inline_note']],
+                    ],
+                ],
+            ]]);
 
         $result = (new AdminCmsWizardSource($client, $cache))->bootstrap($permissions, 'token');
 
         $this->assertSame([], $result['config']['languages']);
         $this->assertSame('rich_text', $result['blockTypes'][0]['block_key']);
+        $this->assertSame('content', $result['blockTypes'][0]['category']);
+        $this->assertSame(['inline_note'], $result['blockTypes'][0]['schema_definition']['allowed_children']);
     }
 }
