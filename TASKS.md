@@ -383,16 +383,13 @@
 
 ### Lecturas compuestas del Admin vía BFF (2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-lecturas-compuestas-via-bff.md`
 
-Extiende el seam `AdminRead` ya usado por `/me/admin-dashboard`
-(`BFF-ADMINREAD-01..04`, cerradas) a otras pantallas del Admin con fan-out
-real: widgets de dashboard restantes, Analytics, usos de archivos y lookups
-de formularios de Event. CMS bootstrap (Fase 5) queda condicionado a
-medición — solo se registra aquí la tarea de medición, no las proyecciones
-resultantes. Fuente arquitectónica: ADR-010. Cada tarea se ejecuta solo tras
-mover su feature a `🔴 En progreso` y con el BFF verificado antes de que
-Admin empiece a consumirla (el Admin no arranca su mitad hasta que la mitad
-del BFF de la misma feature esté cerrada, igual que en `BFF-DASH`/
-`ADM-DASH`).
+El seam `AdminRead` ya cubre dashboard, analytics, traducciones, usos de
+archivos, lookups de Event y bootstraps/workspaces CMS. Las nuevas pantallas
+del Admin deben reutilizar esos contratos o crear un módulo profundo dedicado;
+no se agregan ramas genéricas a un bootstrap existente. CMS bootstrap solo se
+reabre con evidencia runtime nueva. Fuente arquitectónica: ADR-010. Cada tarea
+se ejecuta solo tras mover su feature a `🔴 En progreso` y con el BFF verificado
+antes de que Admin empiece a consumirla.
 
 **Feature 1 — Dashboard: widgets de analytics y traducciones completos**
 

@@ -22,9 +22,10 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
   `BaseConnection` groups (`cms_readonly`, `catalog_readonly`,
   `event_readonly`, `hub_readonly`) for SELECT-only reads. It must never use a
   Model, `model()`, or a write query; `Config\Database::$default` remains the
-  SQLite compatibility stub. `app/AdminRead/**` uses the same named groups only
-  for the authenticated, permission-filtered dashboard projection. These
-  exceptions are local to `teatromuseo-bff` and do not change the
+  SQLite compatibility stub. `app/AdminRead/**` uses the same named groups for
+  authenticated, permission-filtered projections: dashboard, analytics,
+  translations, file usages, Event lookups and CMS bootstrap/workspace reads.
+  These exceptions are local to `teatromuseo-bff` and do not change the
   `ci4-bff-starter` template contract.
 - **No JWT validation.** The BFF forwards the client's `Authorization`
   header to the upstream hub/domain. The upstream validates and either
@@ -132,8 +133,10 @@ guards its performance characteristics.
 existing canonical `/me/dashboard` aggregator has one upstream call, so
 adding concurrency would add complexity without a current benefit. The real
 Admin consumer is `/me/admin-dashboard`; it uses the separate
-`aggregatePartial()` primitive for four independent summaries and reports
-source-level degradation. Both primitives remain sequential. A future
+`aggregatePartial()` primitive for independent Hub/CMS/Catalog/Event summaries
+and reports source-level degradation. The dashboard also exposes CMS analytics
+and translation sections while preserving independent source states. Both
+primitives remain sequential. A future
 aggregator with two or more independent upstream calls must trigger an
 explicit concurrency review; do not change `aggregate()`'s fail-fast
 semantics to implement partial degradation.
