@@ -15,10 +15,11 @@ use App\PublicRead\Page\RedirectReaderInterface;
 use CodeIgniter\Test\CIUnitTestCase;
 use dcardenasl\Ci4ApiCore\Exceptions\NotFoundException;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class PublicPagePathsTest extends CIUnitTestCase
 {
-    /** @dataProvider aliasProvider */
+    #[DataProvider('aliasProvider')]
     public function testCanonicalizesEveryKnownAlias(string $alias, string $locale, ?string $expected): void
     {
         self::assertSame($expected, PublicPagePaths::canonicalPath($alias, $locale));

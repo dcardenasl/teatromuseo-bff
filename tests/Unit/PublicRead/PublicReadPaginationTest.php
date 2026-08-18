@@ -6,10 +6,11 @@ namespace Tests\Unit\PublicRead;
 
 use App\PublicRead\Support\PublicReadPagination;
 use CodeIgniter\Test\CIUnitTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class PublicReadPaginationTest extends CIUnitTestCase
 {
-    /** @dataProvider offsetProvider */
+    #[DataProvider('offsetProvider')]
     public function testCalculatesTheSharedOffset(int $page, int $perPage, int $expected): void
     {
         self::assertSame($expected, PublicReadPagination::offset($page, $perPage));
