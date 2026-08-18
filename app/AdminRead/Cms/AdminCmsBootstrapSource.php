@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AdminRead\Cms;
 
 use App\AdminRead\Contracts\AdminCmsBootstrapSourceInterface;
+use App\AdminRead\Support\JsonArrayAggregateSql;
 use App\AdminRead\Support\ReadOnlyQuery;
 use App\Libraries\Domain\DomainClient;
 use App\Support\RequestTelemetry;
@@ -203,9 +204,10 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
     private function directPageFormOptions(): array
     {
         $db = $this->readDb ?? throw new RuntimeException('CMS read connection is not configured.');
-        $isSqlite = str_contains(strtolower((string) $db->DBDriver), 'sqlite');
-        $aggregate = $isSqlite ? 'json_group_array' : 'JSON_ARRAYAGG';
-        $object = $isSqlite ? 'json_object' : 'JSON_OBJECT';
+        $jsonSql = JsonArrayAggregateSql::forDatabase($db);
+        $aggregate = $jsonSql['aggregate'];
+        $object = $jsonSql['object'];
+        $aggregateSuffix = $jsonSql['suffix'];
         $emptyArray = "'[]'";
 
         $pageTranslations = <<<SQL
@@ -214,7 +216,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                        'language_id', t.language_id,
                        'slug', t.slug,
                        'title', t.title
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id AS translation_id, t.page_id, t.language_id, t.slug, t.title
                 FROM cms_page_translations t
@@ -236,7 +238,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                        'language_id', t.language_id,
                        'slug', t.slug,
                        'name', t.name
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id AS translation_id, t.collection_id, t.language_id, t.slug, t.name
                 FROM cms_collection_translations t
@@ -268,7 +270,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                            'is_active', l.is_active,
                            'fallback_language_id', l.fallback_language_id,
                            'sort_order', l.sort_order
-                       )) AS languages_json
+                       ){$aggregateSuffix}) AS languages_json
                 FROM (
                     SELECT id, code, name, native_name, is_default, is_active,
                            fallback_language_id, sort_order
@@ -288,7 +290,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                            'created_at', p.created_at,
                            'updated_at', p.updated_at,
                            'translations', COALESCE(pt.translations_json, {$emptyArray})
-                       )) AS pages_json
+                       ){$aggregateSuffix}) AS pages_json
                 FROM (
                     SELECT p.id, p.parent_id, p.collection_id, p.page_type, p.status,
                            p.sort_order, p.created_at, p.updated_at
@@ -307,7 +309,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
                            'is_active', c.is_active,
                            'sort_order', c.sort_order,
                            'translations', COALESCE(ct.translations_json, {$emptyArray})
-                       )) AS collections_json
+                       ){$aggregateSuffix}) AS collections_json
                 FROM (
                     SELECT c.id, c.collection_key, c.collection_type, c.is_active, c.sort_order
                     FROM cms_collections c

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AdminRead\Cms;
 
 use App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface;
+use App\AdminRead\Support\JsonArrayAggregateSql;
 use App\AdminRead\Support\ReadOnlyQuery;
 use App\PublicRead\Cms\FileUrlResolver;
 use CodeIgniter\Database\BaseConnection;
@@ -126,9 +127,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
      */
     private function workspaceProjection(string $ownerType, int $ownerId, array $permissions): ?array
     {
-        $isSqlite = str_contains(strtolower((string) $this->db->DBDriver), 'sqlite');
-        $aggregate = $isSqlite ? 'json_group_array' : 'JSON_ARRAYAGG';
-        $object = $isSqlite ? 'json_object' : 'JSON_OBJECT';
+        $jsonSql = JsonArrayAggregateSql::forDatabase($this->db);
+        $aggregate = $jsonSql['aggregate'];
+        $object = $jsonSql['object'];
+        $aggregateSuffix = $jsonSql['suffix'];
         $emptyArray = "'[]'";
 
         $pageTranslations = <<<SQL
@@ -150,7 +152,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'schema_data', t.schema_data,
                        'created_at', t.created_at,
                        'updated_at', t.updated_at
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT id, page_id, language_id, slug, title, excerpt,
                        meta_title, meta_description, og_image_file_id,
@@ -183,7 +185,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'schema_data', t.schema_data,
                        'created_at', t.created_at,
                        'updated_at', t.updated_at
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT id, entry_id, language_id, slug, title, excerpt,
                        featured_file_id, featured_image_url, meta_title,
@@ -207,7 +209,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'is_published', t.is_published,
                        'created_at', t.created_at,
                        'updated_at', t.updated_at
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id, t.instance_id, t.language_id, t.block_data,
                        t.is_published, t.created_at, t.updated_at
@@ -239,7 +241,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'created_at', bi.created_at,
                        'updated_at', bi.updated_at,
                        'translations', COALESCE(bt.translations_json, {$emptyArray})
-                   )) AS blocks_json
+                   ){$aggregateSuffix}) AS blocks_json
             FROM cms_block_instances bi
             LEFT JOIN ({$blockTranslations}) bt ON bt.instance_id = bi.id
             WHERE bi.owner_type = '{$ownerType}'
@@ -261,7 +263,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'is_container', b.is_container,
                        'is_active', b.is_active,
                        'sort_order', b.sort_order
-                   )) AS block_types_json
+                   ){$aggregateSuffix}) AS block_types_json
             FROM (
                 SELECT id, block_key, name, description, category, icon,
                        schema_definition, supports_pages, supports_entries,
@@ -282,7 +284,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'is_active', l.is_active,
                        'fallback_language_id', l.fallback_language_id,
                        'sort_order', l.sort_order
-                   )) AS languages_json
+                   ){$aggregateSuffix}) AS languages_json
             FROM (
                 SELECT id, code, name, native_name, is_default, is_active,
                        fallback_language_id, sort_order
@@ -300,7 +302,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'language_id', t.language_id,
                        'slug', t.slug,
                        'name', t.name
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id, t.collection_id, t.language_id, t.slug, t.name
                 FROM cms_collection_translations t
@@ -324,7 +326,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'is_active', c.is_active,
                        'sort_order', c.sort_order,
                        'translations', COALESCE(ct.translations_json, {$emptyArray})
-                   )) AS collections_json
+                   ){$aggregateSuffix}) AS collections_json
             FROM (
                 SELECT c.id, c.collection_key, c.collection_type, c.is_active, c.sort_order
                 FROM cms_collections c
@@ -342,7 +344,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'language_id', t.language_id,
                        'slug', t.slug,
                        'title', t.title
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id, t.page_id, t.language_id, t.slug, t.title
                 FROM cms_page_translations t
@@ -369,7 +371,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'created_at', p.created_at,
                        'updated_at', p.updated_at,
                        'translations', COALESCE(pt.translations_json, {$emptyArray})
-                   )) AS pages_json
+                   ){$aggregateSuffix}) AS pages_json
             FROM (
                 SELECT p.id, p.parent_id, p.collection_id, p.page_type, p.status, p.sort_order, p.created_at, p.updated_at
                 FROM cms_pages p
@@ -387,7 +389,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'language_id', t.language_id,
                        'slug', t.slug,
                        'title', t.title
-                   )) AS translations_json
+                   ){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id, t.entry_id, t.language_id, t.slug, t.title
                 FROM cms_entry_translations t
@@ -413,7 +415,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'created_at', e.created_at,
                        'updated_at', e.updated_at,
                        'translations', COALESCE(et.translations_json, {$emptyArray})
-                   )) AS entries_json
+                   ){$aggregateSuffix}) AS entries_json
             FROM (
                 SELECT e.id, e.collection_id, e.workflow_status, e.published_at, e.sort_order, e.created_at, e.updated_at
                 FROM cms_entries e
@@ -425,7 +427,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         SQL;
 
         $forms = <<<SQL
-            SELECT {$aggregate}({$object}('form_key', f.form_key)) AS forms_json
+            SELECT {$aggregate}({$object}('form_key', f.form_key){$aggregateSuffix}) AS forms_json
             FROM (
                 SELECT id, form_key
                 FROM cms_forms
@@ -437,7 +439,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
 
         $categoryTranslations = <<<SQL
             SELECT t.category_id,
-                   {$aggregate}({$object}('id', t.id, 'language_id', t.language_id, 'name', t.name)) AS translations_json
+                   {$aggregate}({$object}('id', t.id, 'language_id', t.language_id, 'name', t.name){$aggregateSuffix}) AS translations_json
             FROM (
                 SELECT t.id, t.category_id, t.language_id, t.name
                 FROM cms_category_translations t
@@ -458,7 +460,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'id', c.id,
                        'collection_id', c.collection_id,
                        'translations', COALESCE(ct.translations_json, {$emptyArray})
-                   )) AS categories_json
+                   ){$aggregateSuffix}) AS categories_json
             FROM (
                 SELECT c.id, c.collection_id
                 FROM cms_categories c
