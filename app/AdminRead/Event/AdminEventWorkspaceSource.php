@@ -72,7 +72,9 @@ final class AdminEventWorkspaceSource implements AdminEventWorkspaceSourceInterf
               AND s.resource_id = ?
         SQL;
         $sql = <<<SQL
-            SELECT event.*,
+            SELECT event.id, event.uuid, event.title, event.event_type, event.description,
+                   event.cover_file_id, event.gallery_file_ids, event.status,
+                   event.created_at, event.updated_at, event.deleted_at,
                    COALESCE(translation_projection.translations_json, {$empty}) AS translations_json,
                    COALESCE(slug_projection.slugs_json, {$empty}) AS slugs_json
             FROM events event
