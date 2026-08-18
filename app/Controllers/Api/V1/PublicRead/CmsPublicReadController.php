@@ -18,12 +18,20 @@ final class CmsPublicReadController extends PublicReadSupport
 {
     public function navigation(string $locale): ResponseInterface
     {
-        return $this->result(Services::publicReadCms()->navigation->show($locale));
+        try {
+            return $this->result(Services::publicReadCms()->navigation->show($locale));
+        } catch (Throwable $exception) {
+            return $this->failure($locale, $exception);
+        }
     }
 
     public function settings(string $locale): ResponseInterface
     {
-        return $this->result(Services::publicReadCms()->settings->show($locale));
+        try {
+            return $this->result(Services::publicReadCms()->settings->show($locale));
+        } catch (Throwable $exception) {
+            return $this->failure($locale, $exception);
+        }
     }
 
     public function languages(): ResponseInterface
