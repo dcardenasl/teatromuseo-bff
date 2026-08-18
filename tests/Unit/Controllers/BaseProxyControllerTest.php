@@ -19,21 +19,20 @@ final class BaseProxyControllerTest extends CIUnitTestCase
         Services::reset();
     }
 
-    public function testAggregatePartialReturnsAllSuccessfulSources(): void
+    public function testAggregatePartialDataReturnsAllSuccessfulSources(): void
     {
-        $body = $this->runAggregatePartial([
+        $data = $this->runAggregatePartialData([
             'hub' => static fn (): array => ['users' => 4],
             'cms' => static fn (): array => ['pages' => 7],
         ]);
 
-        $this->assertSame('success', $body['status']);
-        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $body['data']['hub']);
-        $this->assertSame(['state' => 'ok', 'data' => ['pages' => 7]], $body['data']['cms']);
+        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $data['hub']);
+        $this->assertSame(['state' => 'ok', 'data' => ['pages' => 7]], $data['cms']);
     }
 
-    public function testAggregatePartialMarksAllFailedSourcesUnavailable(): void
+    public function testAggregatePartialDataMarksAllFailedSourcesUnavailable(): void
     {
-        $body = $this->runAggregatePartial([
+        $data = $this->runAggregatePartialData([
             'hub' => static function (): array {
                 throw new RuntimeException('hub unavailable');
             },
@@ -42,15 +41,14 @@ final class BaseProxyControllerTest extends CIUnitTestCase
             },
         ]);
 
-        $this->assertSame('success', $body['status']);
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $body['data']['hub']);
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $body['data']['cms']);
+        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['hub']);
+        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['cms']);
     }
 
-    public function testAggregatePartialContinuesAfterOneSourceFails(): void
+    public function testAggregatePartialDataContinuesAfterOneSourceFails(): void
     {
         $order = [];
-        $body  = $this->runAggregatePartial([
+        $data  = $this->runAggregatePartialData([
             'hub' => static function () use (&$order): array {
                 $order[] = 'hub';
 
@@ -68,16 +66,16 @@ final class BaseProxyControllerTest extends CIUnitTestCase
         ]);
 
         $this->assertSame(['hub', 'cms', 'event'], $order);
-        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $body['data']['hub']);
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $body['data']['cms']);
-        $this->assertSame(['state' => 'ok', 'data' => ['events' => 2]], $body['data']['event']);
+        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $data['hub']);
+        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['cms']);
+        $this->assertSame(['state' => 'ok', 'data' => ['events' => 2]], $data['event']);
     }
 
-    public function testAggregatePartialRecordsSourceOutcomesWhenTelemetryIsActive(): void
+    public function testAggregatePartialDataRecordsSourceOutcomesWhenTelemetryIsActive(): void
     {
         RequestTelemetry::begin('request-789');
 
-        $this->runAggregatePartial([
+        $this->runAggregatePartialData([
             'hub' => static fn (): array => ['users' => 4],
             'cms' => static function (): array {
                 throw new RuntimeException('cms unavailable');
@@ -94,19 +92,43 @@ final class BaseProxyControllerTest extends CIUnitTestCase
     }
 
     /**
-     * @param array<string, callable(): array<string, mixed>> $calls
-     * @return array<string, mixed>
+     * Regression: `aggregate()`'s outer catch used to only catch `ApiException`,
+     * so a plain `Throwable` thrown inside a call closure (e.g. a `RuntimeException`
+     * from an `AdminRead`/`PublicRead` source, which never throws `ApiException`)
+     * would escape uncaught and fall through to the framework's global exception
+     * handler — which, before the `AppExceptionHandler` fix, leaked the raw
+     * message to the client outside `development`. `handleOperation()` and
+     * `aggregatePartialData()` already caught `Throwable`; this closes the same
+     * gap in `aggregate()`.
      */
-    private function runAggregatePartial(array $calls): array
+    public function testAggregateSanitizesAPlainThrowableInsteadOfLettingItEscape(): void
     {
         $controller = new TestableBaseProxyController();
         $controller->initController(Services::request(), Services::response(), Services::logger());
-        $response = $controller->runAggregatePartial($calls);
 
-        /** @var array<string, mixed> $body */
+        $response = $controller->runAggregate([
+            'hub' => static function (): array {
+                throw new RuntimeException('SQLSTATE[42S02]: table `cms_languages` not found at /var/www/app/Foo.php:123');
+            },
+        ]);
+
         $body = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
 
-        return $body;
+        $this->assertSame(503, $response->getStatusCode());
+        $this->assertStringNotContainsString('cms_languages', json_encode($body, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('/var/www/app/Foo.php', json_encode($body, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param array<string, callable(): array<string, mixed>> $calls
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
+     */
+    private function runAggregatePartialData(array $calls): array
+    {
+        $controller = new TestableBaseProxyController();
+        $controller->initController(Services::request(), Services::response(), Services::logger());
+
+        return $controller->runAggregatePartialData($calls);
     }
 }
 
@@ -114,9 +136,18 @@ final class TestableBaseProxyController extends BaseProxyController
 {
     /**
      * @param array<string, callable(): array<string, mixed>> $calls
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
      */
-    public function runAggregatePartial(array $calls): ResponseInterface
+    public function runAggregatePartialData(array $calls): array
     {
-        return $this->aggregatePartial($calls);
+        return $this->aggregatePartialData($calls);
+    }
+
+    /**
+     * @param array<string, callable(): array<string, mixed>> $calls
+     */
+    public function runAggregate(array $calls): ResponseInterface
+    {
+        return $this->aggregate($calls);
     }
 }

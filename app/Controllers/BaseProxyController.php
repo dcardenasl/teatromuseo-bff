@@ -18,16 +18,21 @@ use Throwable;
 /**
  * Base controller for BFF proxy/aggregator endpoints.
  *
- * Subclasses pick one of two primitives:
+ * Subclasses pick the primitive that matches their endpoint's job:
  *
  *  - {@see proxy()} — transparent forward. Upstream status/body/content-type
  *    flow back unchanged. Use for one-to-one passthroughs.
  *  - {@see aggregate()} — combine N upstream calls into a single
- *    `ApiResponse::success([...])` envelope. Use when one client request
- *    fans out to multiple services.
- *  - {@see aggregatePartial()} — combine independent calls while isolating
- *    failures per source. Use when a degraded source must not hide healthy
- *    sources from the client.
+ *    `ApiResponse::success([...])` envelope, fail-fast. Use when one client
+ *    request fans out to multiple services and a degraded source should
+ *    abort the whole response.
+ *  - {@see aggregatePartialData()} — combine independent calls while
+ *    isolating failures per source (`{state, data}` per key), for a
+ *    controller that builds its own envelope shape around the per-source
+ *    results. Use when a degraded source must not hide healthy sources.
+ *  - {@see handleOperation()} — wrap a single operation (which may validate
+ *    input before building its response) in the same sanitized error
+ *    contract as the primitives above.
  *
  * Canonical {@see ApiException}s thrown by the underlying client are caught
  * here and rendered via {@see ExceptionFormatter} so the wire shape matches
@@ -108,6 +113,16 @@ abstract class BaseProxyController extends Controller
             return $this->response->setJSON(ApiResponse::success($data));
         } catch (ApiException $e) {
             return $this->respondWithException($e);
+        } catch (Throwable $exception) {
+            log_message('error', sprintf(
+                'aggregate() call failed: %s: %s',
+                $exception::class,
+                $exception->getMessage(),
+            ));
+
+            return $this->respondWithException(new \dcardenasl\Ci4ApiCore\Exceptions\ServiceUnavailableException(
+                'One or more upstream sources are unavailable.',
+            ));
         }
     }
 
@@ -120,23 +135,15 @@ abstract class BaseProxyController extends Controller
      * intentionally separate from {@see aggregate()}: that helper is the
      * fail-fast contract used by existing consumers such as `/me/dashboard`
      * and `UsersProxyController`, while this helper is for independent data
-     * sources where partial degradation is the desired response.
+     * sources where partial degradation is the desired response. Every
+     * current caller (`AdminDashboardController`, `AdminFileUsagesController`)
+     * builds its own `source`/`complete` envelope around this data rather
+     * than returning it as-is, so there is no plain wrapper here — build the
+     * envelope in the controller.
      *
      * Calls remain sequential by design. Introducing concurrency would be a
      * separate change requiring an explicit review of ordering and failure
      * semantics.
-     *
-     * @param array<string, callable(): array<string, mixed>> $calls
-     */
-    protected function aggregatePartial(array $calls): ResponseInterface
-    {
-        return $this->response->setJSON(ApiResponse::success($this->aggregatePartialData($calls)));
-    }
-
-    /**
-     * Collect partial results for controllers that need to build a domain
-     * specific envelope while preserving the same isolation semantics as
-     * {@see aggregatePartial()}.
      *
      * @param array<string, callable(): array<array-key, mixed>> $calls
      * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
@@ -220,6 +227,43 @@ abstract class BaseProxyController extends Controller
                 $source . ' unavailable.',
             ));
         }
+    }
+
+    /**
+     * Reduces a list of per-source states (`'ok'`/`'unavailable'`) from an
+     * `aggregatePartialData()` call into one overall state for the response
+     * envelope's top-level `source.state`: `ok` when every source succeeded,
+     * `partial` when at least one did, `unavailable` when none did.
+     *
+     * @param list<string> $states
+     */
+    protected function overallState(array $states): string
+    {
+        if ($states !== [] && count(array_unique($states)) === 1 && $states[0] === 'ok') {
+            return 'ok';
+        }
+
+        if (in_array('ok', $states, true)) {
+            return 'partial';
+        }
+
+        return 'unavailable';
+    }
+
+    /**
+     * Extracts the bearer token from the incoming `Authorization` header.
+     * Controllers that need the raw token to forward to an authenticated
+     * upstream call (rather than only the `ContextHolder` identity/permission
+     * projection populated by the auth filters) use this.
+     */
+    protected function extractBearerToken(): ?string
+    {
+        $header = $this->request->getHeaderLine('Authorization');
+        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return null;
     }
 
     private function elapsedSince(int $startedAt): float
