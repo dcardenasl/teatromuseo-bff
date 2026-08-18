@@ -27,6 +27,22 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
   translations, file usages, Event lookups and CMS bootstrap/workspace reads.
   These exceptions are local to `teatromuseo-bff` and do not change the
   `ci4-bff-starter` template contract.
+  - **Documented exception:** `AdminCmsWizardSource` and `AdminCmsBootstrapSource`
+    (under `app/AdminRead/Cms/`) additionally call the CMS Domain over
+    authenticated HTTP via `DomainClient`, instead of reading `cms_readonly`
+    directly — `AdminCmsWizardSource` exclusively, `AdminCmsBootstrapSource` as
+    a fallback path alongside its direct-SQL projections. This reuses an
+    existing CMS Domain compound endpoint (`/api/v1/cms/wizard/config`) rather
+    than adding a second HTTP call or duplicating its business rules in SQL —
+    it is a deliberate exception to the "SQL-only" rule above, not a violation
+    of it.
+  - **Cross-seam reuse:** `AdminReadContainer::cmsWorkspace()` constructs
+    `App\PublicRead\Cms\FileUrlResolver` and
+    `App\PublicRead\Support\DirectDbFileMetaResolver` — both `PublicRead`
+    namespace classes — to resolve file URLs for the authenticated CMS
+    workspace projection. This is intentional reuse of file-URL resolution
+    logic, not a boundary violation; `AdminRead` and `PublicRead` still each
+    own their own query/permission logic.
 - **No JWT validation.** The BFF forwards the client's `Authorization`
   header to the upstream hub/domain. The upstream validates and either
   returns the response or a 401 — the BFF just relays.
@@ -228,7 +244,7 @@ class DashboardController extends BaseProxyController
         $context     = ContextHolder::get();
         $userId      = $context?->user_id;
         $permissions = $context !== null ? $context->permissions : [];
-        $bearer      = $this->extractBearerToken(); // your helper
+        $bearer      = $this->extractBearerToken(); // inherited from BaseProxyController
 
         if ($userId === null || $bearer === null) {
             throw new AuthenticationException('Missing authenticated user context.');
@@ -256,12 +272,82 @@ different contracts:
   the Hub profile and token permissions and remains available for reference.
 - `GET /api/v1/me/admin-dashboard` is the real consumer used by
   `teatromuseo-admin`. It combines Hub, CMS, Catalog and Event summaries with
-  `aggregatePartial()`, so one unavailable source does not hide healthy
-  sections. The Hub summary remains an authenticated upstream call; CMS,
-  Catalog and Event use `app/AdminRead/**` direct SELECT-only readers. The
-  route uses `effectivepermissionsauth` so readers receive the canonical
-  cross-application permission scope from Hub `/auth/me`, while the existing
-  source-level degradation contract remains unchanged.
+  `aggregatePartialData()` (the lower-level primitive behind `aggregatePartial()`
+  — used directly, not through the wrapper, because the controller builds a
+  custom `source`/`complete` envelope shape around the per-source results), so
+  one unavailable source does not hide healthy sections. The Hub summary
+  remains an authenticated upstream call; CMS, Catalog and Event use
+  `app/AdminRead/**` direct SELECT-only readers. The route uses
+  `effectivepermissionsauth` so readers receive the canonical cross-application
+  permission scope from Hub `/auth/me`, while the existing source-level
+  degradation contract remains unchanged.
+
+### Pattern 4 — Single operation with pre-validation (`handleOperation()`)
+
+Use when an endpoint needs to validate input (query params, path IDs) and
+throw a clean `ValidationException`/`AuthorizationException` *before* building
+its response envelope, but doesn't fan out to multiple independent sources the
+way `aggregate()`/`aggregatePartial()` do. This is the primitive most
+`Me/Admin*` controllers actually use — every CMS/Catalog/Event workspace and
+bootstrap controller, plus `/me/admin-analytics` and
+`/me/admin-cms/wizard-bootstrap`:
+
+```php
+class AdminCatalogWorkspaceController extends BaseProxyController
+{
+    public function workspace(?string $itemId = null): ResponseInterface
+    {
+        $id = $itemId === null ? null : $this->requirePositiveId($itemId, 'itemId');
+        $context = ContextHolder::get();
+        if ($context?->user_id === null) {
+            throw new AuthenticationException('Missing authenticated user context.');
+        }
+
+        return $this->handleOperation(function () use ($id, $context): ResponseInterface {
+            $sections = Services::adminReadCatalogCollectionItem()->workspace($id, $context->permissions);
+
+            return $this->response->setJSON(ApiResponse::success([
+                'version' => 1,
+                'generated_at' => date(DATE_ATOM),
+                'sections' => $sections,
+            ]));
+        }, 'Catalog admin collection item workspace');
+    }
+}
+```
+
+`handleOperation()` wraps the closure in the same sanitized error contract as
+`proxy()`/`aggregate()` (`ApiException` → `ExceptionFormatter`; any other
+`Throwable` → logged server-side, rendered as a generic `ServiceUnavailableException`)
+and records one `RequestTelemetry` source entry keyed by the label passed as
+the second argument. Validation that runs *before* `handleOperation()` (like
+the ID check above) is not wrapped — let it throw its own `ValidationException`
+directly so a 422 doesn't get relabeled as a 503.
+
+### Pattern 5 — Direct public-read seam (`PublicReadSupport`)
+
+The four `PublicRead/**` controllers (`CmsPublicReadController`,
+`CatalogPublicReadController`, `EventPublicReadController`,
+`PageResolutionController`) don't use `proxy()`/`aggregate()`/`handleOperation()`
+at all — they extend `App\Controllers\Api\V1\PublicRead\PublicReadSupport`
+(itself a `BaseProxyController` subclass), which provides its own envelope
+primitives instead:
+
+- `result(ApiResult $result)` — return a reader's `ApiResult` as-is (already
+  shaped by `PublicReadEnvelope`).
+- `data(array $data)` — wrap a plain array in `{data, meta: {generated_at}}`
+  for endpoints that don't need the full envelope (e.g. `languages()`,
+  `collections()`).
+- `failure(string $locale, Throwable $exception, int $status = 503)` — the
+  sanitized error path: logs the real exception server-side, returns
+  `PublicReadEnvelope::unavailable()` to the client. Every action must wrap
+  its reader call in `try { ... } catch (Throwable $exception) { return
+  $this->failure(...); }` — a method that skips this (as `navigation()`/
+  `settings()` used to) lets the exception escape to the framework's global
+  handler instead of this sanitized path.
+
+Use this pattern only for the public, unauthenticated, app-key-gated seam;
+authenticated Admin projections belong to Pattern 3/4 instead.
 
 ### What ships out of the box
 
