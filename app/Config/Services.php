@@ -202,6 +202,15 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::eventDashboard();
     }
 
+    public static function adminReadEventWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminEventWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventWorkspace();
+    }
+
     public static function adminReadFileUsages(bool $getShared = true): \App\AdminRead\Contracts\AdminFileUsageSourceInterface
     {
         if ($getShared) {

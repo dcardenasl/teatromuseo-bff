@@ -14,6 +14,7 @@ use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
 use App\AdminRead\Cms\CmsTranslationsDashboardSource;
 use App\AdminRead\Event\AdminEventLookupSource;
+use App\AdminRead\Event\AdminEventWorkspaceSource;
 use App\AdminRead\Event\EventDashboardSource;
 use App\AdminRead\Files\AdminFileUsageSource;
 use CodeIgniter\Database\BaseConnection;
@@ -71,6 +72,14 @@ final class AdminReadContainer
     public static function eventDashboard(): EventDashboardSource
     {
         return new EventDashboardSource(self::database('event_readonly'));
+    }
+
+    public static function eventWorkspace(): AdminEventWorkspaceSource
+    {
+        return new AdminEventWorkspaceSource(
+            self::database('event_readonly'),
+            self::database('cms_readonly'),
+        );
     }
 
     public static function fileUsages(): AdminFileUsageSource

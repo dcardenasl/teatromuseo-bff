@@ -44,6 +44,16 @@ $routes->get(
     ['filter' => 'effectivepermissionsauth'],
 );
 $routes->get(
+    'me/admin-event/events/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminEventWorkspaceController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-event/events/(:num)/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminEventWorkspaceController::event/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
     'me/admin-cms/entry-form-options',
     '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::entryFormOptions',
     ['filter' => 'effectivepermissionsauth'],
