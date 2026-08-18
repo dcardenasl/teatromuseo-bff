@@ -86,7 +86,16 @@ readonly class PublicReadEntryRequestDTO extends BaseRequestDTO
             'order_by' => 'permit_empty|regex_match[/^(published_at|sort_order|created_at|title|field:[a-z][a-z0-9_]{0,49}|field:(entry|block|taxonomy)\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)$/]',
             'order_direction' => 'permit_empty|in_list[asc,desc,upcoming,ASC,DESC,UPCOMING]',
             'fields' => 'permit_empty|string|max_length[2000]',
-            'filter_by' => 'permit_empty|string|max_length[100]',
+            // Mirrors the facet-key shape `order_by`'s `field:` branch already
+            // allow-lists (see PublicReadEntryReader::classifyField(), which
+            // both `filter_by` and the stripped `order_by=field:...` value
+            // feed into) — an `entry.<column>` reference, a `taxonomy.`/
+            // `block.` namespaced facet key, or a bare facet key. Previously
+            // this only had a length cap; the shape allow-list here is
+            // defense-in-depth (classifyField() already routes anything
+            // outside these shapes into a safely-escaped facet lookup or a
+            // deny-all filter), not the only thing preventing injection.
+            'filter_by' => 'permit_empty|regex_match[/^([a-z][a-z0-9_]{0,49}|(entry|block|taxonomy)\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)?)$/]',
             'filter_value' => 'permit_empty|string|max_length[255]',
             'filter_operator' => 'permit_empty|in_list[equals,contains]',
             'include' => 'permit_empty|string|max_length[300]',
