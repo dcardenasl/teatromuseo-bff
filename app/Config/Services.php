@@ -256,6 +256,15 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::cmsWizard();
     }
 
+    public static function adminReadIamRoleWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminIamRoleWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadIamRoleWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::iamRoleWorkspace();
+    }
+
     public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
     {
         if ($getShared) {
