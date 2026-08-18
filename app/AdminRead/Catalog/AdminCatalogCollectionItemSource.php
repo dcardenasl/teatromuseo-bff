@@ -87,7 +87,14 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
               AND technique.deleted_at IS NULL
         SQL;
         $sql = <<<SQL
-            SELECT item.*,
+            SELECT item.id, item.name, item.category_id, item.inventory_code, item.status,
+                   item.summary, item.curiosidad, item.contenido, item.origin, item.period,
+                   item.creator, item.ubicacion, item.materials, item.cover_file_id,
+                   item.gallery_file_ids, item.show_in_totem, item.internal_notes,
+                   item.collection_number, item.collection_group, item.physical_description,
+                   item.dimensions, item.ingress_type, item.donated_by, item.tags, item.links,
+                   item.company_history, item.is_active, item.created_at, item.updated_at,
+                   item.deleted_at,
                    category.name AS category_name,
                    COALESCE(translation_projection.translations_json, {$empty}) AS translations_json,
                    COALESCE(technique_projection.techniques_json, {$empty}) AS techniques_json
