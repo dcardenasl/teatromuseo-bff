@@ -25,6 +25,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
     public function __construct(
         private readonly BaseConnection $db,
         private readonly FileUrlResolver $fileUrlResolver,
+        private readonly ?BlockTranslationStatusProjection $blockTranslationStatusProjection = null,
     ) {
     }
 
@@ -81,6 +82,8 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             $entries,
             $projection['categories'],
         );
+        $translationStatus = ($this->blockTranslationStatusProjection ?? new BlockTranslationStatusProjection())
+            ->project($blocks, $blockTypes, $languages);
 
         $sections = [
             $ownerType => $owner,
@@ -92,7 +95,8 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             'collectionsMap' => $this->collectionsMap($collections),
             'listingFieldCatalog' => $this->listingFieldCatalog($collections, $blockTypes),
             'quality' => [],
-            'blockTranslationStatus' => [],
+            'blockTranslationStatus' => $translationStatus['blocks'],
+            'blockTranslationSummary' => $translationStatus['summary'],
         ];
         if ($ownerType === 'entry') {
             $sections['entries'] = $entries;
@@ -323,12 +327,17 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                        'id', c.id,
                        'collection_key', c.collection_key,
                        'collection_type', c.collection_type,
+                       'enables_categories', c.enables_categories,
+                       'enables_tags', c.enables_tags,
+                       'block_template', c.block_template,
                        'is_active', c.is_active,
                        'sort_order', c.sort_order,
                        'translations', COALESCE(ct.translations_json, {$emptyArray})
                    ){$aggregateSuffix}) AS collections_json
             FROM (
-                SELECT c.id, c.collection_key, c.collection_type, c.is_active, c.sort_order
+                SELECT c.id, c.collection_key, c.collection_type,
+                       c.enables_categories, c.enables_tags, c.block_template,
+                       c.is_active, c.sort_order
                 FROM cms_collections c
                 WHERE c.is_active = 1
                 ORDER BY c.sort_order ASC, c.id ASC
@@ -474,6 +483,66 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             ? $categoriesProjection
             : "SELECT {$emptyArray} AS categories_json";
 
+        $entryCategories = "SELECT {$emptyArray} AS entry_categories_json";
+        $entryTags = "SELECT {$emptyArray} AS entry_tags_json";
+        $taxonomyPermissions = $ownerType === 'entry'
+            && (in_array('cms.categories.read', $permissions, true) || in_array('cms.tags.read', $permissions, true));
+        if ($taxonomyPermissions && in_array('cms.categories.read', $permissions, true)) {
+            $entryCategoryTranslations = <<<SQL
+                SELECT t.category_id,
+                       {$aggregate}({$object}(
+                           'id', t.id,
+                           'language_id', t.language_id,
+                           'slug', t.slug,
+                           'name', t.name
+                       ){$aggregateSuffix}) AS translations_json
+                FROM cms_category_translations t
+                INNER JOIN cms_entry_categories ec ON ec.category_id = t.category_id
+                WHERE ec.entry_id = ?
+                GROUP BY t.category_id
+            SQL;
+            $entryCategories = <<<SQL
+                SELECT ec.entry_id,
+                       {$aggregate}({$object}(
+                           'id', c.id,
+                           'collection_id', c.collection_id,
+                           'translations', COALESCE(ct.translations_json, {$emptyArray})
+                       ){$aggregateSuffix}) AS entry_categories_json
+                FROM cms_entry_categories ec
+                INNER JOIN cms_categories c ON c.id = ec.category_id AND c.is_active = 1
+                LEFT JOIN ({$entryCategoryTranslations}) ct ON ct.category_id = c.id
+                WHERE ec.entry_id = ?
+                GROUP BY ec.entry_id
+            SQL;
+        }
+        if ($taxonomyPermissions && in_array('cms.tags.read', $permissions, true)) {
+            $entryTagTranslations = <<<SQL
+                SELECT t.tag_id,
+                       {$aggregate}({$object}(
+                           'id', t.id,
+                           'language_id', t.language_id,
+                           'slug', t.slug,
+                           'name', t.name
+                       ){$aggregateSuffix}) AS translations_json
+                FROM cms_tag_translations t
+                INNER JOIN cms_entry_tags et ON et.tag_id = t.tag_id
+                WHERE et.entry_id = ?
+                GROUP BY t.tag_id
+            SQL;
+            $entryTags = <<<SQL
+                SELECT et.entry_id,
+                       {$aggregate}({$object}(
+                           'id', t.id,
+                           'translations', COALESCE(tt.translations_json, {$emptyArray})
+                       ){$aggregateSuffix}) AS entry_tags_json
+                FROM cms_entry_tags et
+                INNER JOIN cms_tags t ON t.id = et.tag_id AND t.is_active = 1
+                LEFT JOIN ({$entryTagTranslations}) tt ON tt.tag_id = t.id
+                WHERE et.entry_id = ?
+                GROUP BY et.entry_id
+            SQL;
+        }
+
         $ownerTable = $ownerType === 'entry' ? 'cms_entries' : 'cms_pages';
         $ownerTranslations = $ownerType === 'entry' ? $entryTranslations : $pageTranslations;
         $ownerSelect = $ownerType === 'entry'
@@ -490,7 +559,9 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                    COALESCE(page_projection.pages_json, {$emptyArray}) AS pages_json,
                    COALESCE(entry_projection.entries_json, {$emptyArray}) AS entries_json,
                    COALESCE(form_projection.forms_json, {$emptyArray}) AS forms_json,
-                   COALESCE(category_projection.categories_json, {$emptyArray}) AS categories_json
+                   COALESCE(category_projection.categories_json, {$emptyArray}) AS categories_json,
+                   COALESCE(entry_category_projection.entry_categories_json, {$emptyArray}) AS entry_categories_json,
+                   COALESCE(entry_tag_projection.entry_tags_json, {$emptyArray}) AS entry_tags_json
             FROM {$ownerTable} o
             LEFT JOIN ({$ownerTranslations}) owner_translations
                 ON owner_translations.resource_id = o.id
@@ -504,6 +575,8 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             LEFT JOIN ({$entries}) entry_projection ON 1 = 1
             LEFT JOIN ({$forms}) form_projection ON 1 = 1
             LEFT JOIN ({$categories}) category_projection ON 1 = 1
+            LEFT JOIN ({$entryCategories}) entry_category_projection ON 1 = 1
+            LEFT JOIN ({$entryTags}) entry_tag_projection ON 1 = 1
             WHERE o.id = ?
               AND o.deleted_at IS NULL
             LIMIT 1
@@ -512,7 +585,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         $rows = ReadOnlyQuery::sql(
             $this->db,
             $sql,
-            [$ownerId, $ownerId, $ownerId, $ownerId],
+            $this->workspaceBindings($ownerId, $ownerType, $permissions),
             'CMS admin ' . $ownerType . ' workspace projection',
         );
         $row = $rows[0] ?? null;
@@ -546,6 +619,8 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             $owner['entries_json'],
             $owner['forms_json'],
             $owner['categories_json'],
+            $owner['entry_categories_json'],
+            $owner['entry_tags_json'],
         );
         $owner['id'] = (int) $owner['id'];
         $owner['collection_id'] = $owner['collection_id'] === null ? null : (int) $owner['collection_id'];
@@ -568,6 +643,8 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         $owner['slug'] = (string) ($default['slug'] ?? '');
         if ($ownerType === 'entry') {
             $owner['excerpt'] = (string) ($default['excerpt'] ?? '');
+            $owner['categories'] = $this->decodeJsonList($row['entry_categories_json'] ?? null);
+            $owner['tags'] = $this->decodeJsonList($row['entry_tags_json'] ?? null);
         }
 
         $blocks = $this->decodeJsonList($row['blocks_json'] ?? null);
@@ -621,6 +698,9 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         foreach ($collections as &$collection) {
             $collection['id'] = (int) ($collection['id'] ?? 0);
             $collection['is_active'] = (bool) ($collection['is_active'] ?? false);
+            $collection['enables_categories'] = (bool) ($collection['enables_categories'] ?? false);
+            $collection['enables_tags'] = (bool) ($collection['enables_tags'] ?? false);
+            $collection['block_template'] = $this->decodeJson($collection['block_template'] ?? null);
             $collection['translations'] = $this->decodeJsonList($collection['translations'] ?? null);
             $collection['name'] = (string) ($collection['translations'][0]['name'] ?? $collection['collection_key'] ?? '');
         }
@@ -670,6 +750,43 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             $language['is_active'] = (bool) ($language['is_active'] ?? false);
         }
         unset($language);
+
+        $languageCodes = [];
+        foreach ($languages as $language) {
+            $languageCodes[(int) ($language['id'] ?? 0)] = strtolower((string) ($language['code'] ?? ''));
+        }
+        foreach ($collections as &$collection) {
+            $collection['localized_slugs'] = [];
+            foreach ($collection['translations'] ?? [] as $translation) {
+                if (! is_array($translation)) {
+                    continue;
+                }
+                $code = $languageCodes[(int) ($translation['language_id'] ?? 0)] ?? '';
+                $slug = trim((string) ($translation['slug'] ?? ''));
+                if ($code !== '' && $slug !== '') {
+                    $collection['localized_slugs'][$code] = $slug;
+                }
+            }
+            $collection['slug'] = (string) (array_values($collection['localized_slugs'])[0] ?? '');
+        }
+        unset($collection);
+
+        if ($ownerType === 'entry') {
+            foreach (['categories', 'tags'] as $taxonomy) {
+                foreach ($owner[$taxonomy] ?? [] as &$item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $item['id'] = (int) ($item['id'] ?? 0);
+                    $item['collection_id'] = $item['collection_id'] ?? null;
+                    $item['translations'] = $this->decodeJsonList($item['translations'] ?? null);
+                    $firstTranslation = $item['translations'][0] ?? [];
+                    $item['name'] = (string) ($firstTranslation['name'] ?? $item['id']);
+                    $item['slug'] = (string) ($firstTranslation['slug'] ?? $item['id']);
+                }
+                unset($item);
+            }
+        }
 
         return [
             'owner' => $owner,
@@ -967,6 +1084,24 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /** @param list<string> $permissions @return list<int> */
+    private function workspaceBindings(int $ownerId, string $ownerType, array $permissions): array
+    {
+        $bindings = [$ownerId, $ownerId, $ownerId, $ownerId];
+        if ($ownerType === 'entry') {
+            if (in_array('cms.categories.read', $permissions, true)) {
+                $bindings[] = $ownerId;
+                $bindings[] = $ownerId;
+            }
+            if (in_array('cms.tags.read', $permissions, true)) {
+                $bindings[] = $ownerId;
+                $bindings[] = $ownerId;
+            }
+        }
+
+        return $bindings;
     }
 
     /** @param array<int, array<string, mixed>> $media @return array<string, mixed> */

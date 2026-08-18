@@ -27,7 +27,7 @@ final class CmsAdminWorkspaceSourceTest extends CIUnitTestCase
     protected function tearDown(): void
     {
         foreach ([
-            'cms_entry_translations', 'cms_entries', 'cms_collection_translations', 'cms_collections', 'cms_page_translations', 'cms_pages',
+            'cms_entry_tags', 'cms_entry_categories', 'cms_tag_translations', 'cms_tags', 'cms_entry_translations', 'cms_entries', 'cms_collection_translations', 'cms_collections', 'cms_page_translations', 'cms_pages',
             'cms_block_instance_translations', 'cms_block_instances', 'cms_content_blocks', 'cms_category_translations', 'cms_categories',
             'cms_forms', 'cms_languages',
         ] as $table) {
@@ -152,7 +152,7 @@ final class CmsAdminWorkspaceSourceTest extends CIUnitTestCase
             'cms_content_blocks' => 'id INTEGER PRIMARY KEY, block_key TEXT, name TEXT, description TEXT, category TEXT, icon TEXT, schema_definition TEXT, supports_pages INTEGER, supports_entries INTEGER, is_container INTEGER, is_active INTEGER, sort_order INTEGER',
             'cms_block_instances' => 'id INTEGER PRIMARY KEY, block_id INTEGER, owner_type TEXT, owner_id INTEGER, parent_instance_id INTEGER, sort_order INTEGER, column_index INTEGER, is_active INTEGER, block_config TEXT, created_at TEXT, updated_at TEXT',
             'cms_block_instance_translations' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, instance_id INTEGER, language_id INTEGER, block_data TEXT, is_published INTEGER, created_at TEXT, updated_at TEXT',
-            'cms_collections' => 'id INTEGER PRIMARY KEY, collection_key TEXT, collection_type TEXT, is_active INTEGER, sort_order INTEGER',
+            'cms_collections' => 'id INTEGER PRIMARY KEY, collection_key TEXT, collection_type TEXT, enables_categories INTEGER, enables_tags INTEGER, block_template TEXT, is_active INTEGER, sort_order INTEGER',
             'cms_collection_translations' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, collection_id INTEGER, language_id INTEGER, slug TEXT, name TEXT',
             'cms_forms' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, form_key TEXT, is_active INTEGER',
             'cms_categories' => 'id INTEGER PRIMARY KEY, collection_id INTEGER, parent_id INTEGER, sort_order INTEGER, is_active INTEGER',
