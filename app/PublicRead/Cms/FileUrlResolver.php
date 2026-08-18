@@ -9,10 +9,12 @@ use App\PublicRead\Support\FileMetaResolverInterface;
 /**
  * Canonical file URL resolver.
  *
- * Resolves Hub file IDs to public URLs by calling the Hub's internal
- * batch-meta endpoint via HubClient. Results are cached by HubClient
- * (default 300 s per file ID) so repeated resolution within a request
- * and across requests is cheap.
+ * Resolves Hub file IDs to public URLs through a {@see FileMetaResolverInterface}.
+ * The only implementation wired into this repo is
+ * {@see \App\PublicRead\Support\DirectDbFileMetaResolver}, which reads
+ * `hub_readonly` directly — it is not cached. Batching (`resolveMany()`)
+ * is what keeps this cheap: callers collect every file ID a projection
+ * needs first and resolve them in one query, rather than one call per file.
  *
  * The Domain's `cms` database has NO `files` table — files are owned by
  * the Hub. This class is the single point of contact for file URL resolution

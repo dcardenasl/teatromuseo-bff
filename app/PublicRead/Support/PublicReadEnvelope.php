@@ -8,7 +8,16 @@ use DateTimeImmutable;
 use DateTimeZone;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
-/** Canonical versioned envelope shared by all public-read packages. */
+/**
+ * Canonical versioned envelope shared by all public-read packages.
+ *
+ * `meta.expires_at` (like `meta.snapshot_revision`) is always `null` today —
+ * no `PublicRead/**` reader implements caching, so there is no expiry to
+ * report. It stays in the envelope because it is part of the documented
+ * contract shape (`docs/adr/004-public-read-page-delivery-contracts.md`);
+ * changing the shape of a versioned public contract is a cross-repository
+ * decision (coordinated with `teatromuseo-web`), not a local cleanup.
+ */
 final class PublicReadEnvelope
 {
     /**

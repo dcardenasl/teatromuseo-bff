@@ -116,11 +116,6 @@ final class PublicReadContainer
         return new EventTypeReader(self::database('event_readonly'));
     }
 
-    public static function blockTree(): Page\BlockTreeResolver
-    {
-        return self::blockTreeFor(self::cms());
-    }
-
     public static function pageEnvelope(): Page\PageEnvelope
     {
         $cms = self::cms();

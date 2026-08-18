@@ -81,8 +81,14 @@ final readonly class PageEnvelope
         return 200;
     }
 
-    /** @param array<string, mixed> $query
-     *  @return array<string, mixed>
+    /**
+     * `expires_at` is always `null`: this composition has no caching of its
+     * own (see {@see \App\PublicRead\Support\PublicReadEnvelope} for the same
+     * field on the underlying sources). It stays in the envelope because it
+     * is part of the documented `page-resolve` contract shape.
+     *
+     * @param array<string, mixed> $query
+     * @return array<string, mixed>
      */
     private function meta(string $locale, string $route, array $query): array
     {
