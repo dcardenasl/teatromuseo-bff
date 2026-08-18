@@ -17,6 +17,18 @@ $routes->get(
 );
 
 $routes->get(
+    'me/admin-metrics/workspace',
+    '\App\Controllers\Api\V1\Me\AdminMetricsWorkspaceController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+
+$routes->get(
+    'me/admin-iam/roles/(:num)/workspace',
+    '\App\Controllers\Api\V1\Me\AdminIamWorkspaceController::role/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+
+$routes->get(
     'me/admin-analytics',
     '\App\Controllers\Api\V1\Me\AdminAnalyticsController::index',
     ['filter' => 'introspectauth'],
