@@ -100,7 +100,7 @@ final class CmsTranslationsDashboardSource implements AdminDashboardTranslations
             'fk' => 'form_field_id',
             'where' => '1 = 1',
             'required' => ['label'],
-            'optional' => ['placeholder', 'help_text', 'option_labels', 'error_required', 'error_invalid'],
+            'optional' => [],
             'join' => '',
         ],
     ];
@@ -215,8 +215,12 @@ final class CmsTranslationsDashboardSource implements AdminDashboardTranslations
     {
         return <<<'SQL'
             SELECT languages.id AS language_id, COUNT(*) AS total_elements,
-                   SUM(CASE WHEN languages.is_default = 1
-                                  OR (t.id IS NOT NULL AND t.setting_value IS NOT NULL
+                   SUM(CASE WHEN (languages.is_default = 1
+                                  AND r.setting_value IS NOT NULL
+                                  AND TRIM(r.setting_value) <> '')
+                                  OR (languages.is_default <> 1
+                                      AND t.id IS NOT NULL
+                                      AND t.setting_value IS NOT NULL
                                       AND TRIM(t.setting_value) <> '')
                             THEN 1 ELSE 0 END) AS completed_elements
             FROM active_languages languages
@@ -235,12 +239,47 @@ final class CmsTranslationsDashboardSource implements AdminDashboardTranslations
         // portable predicate keeps the dashboard projection SQL-only on both
         // MySQL 8 and the SQLite contract fixture. The detailed block auditor
         // remains responsible for schema-specific field diagnostics.
+        //
+        // An optional block with no content in any language is complete even
+        // when it has no translation rows. This is the same
+        // shouldReportMissing() rule used by the full audit: empty containers
+        // (for example, a gallery whose content lives in child instances) do
+        // not create missing-translation work. Required fields, or content in
+        // at least one language, make the per-language row actionable again.
         return <<<'SQL'
             SELECT languages.id AS language_id, COUNT(*) AS total_elements,
-                   SUM(CASE WHEN t.id IS NOT NULL
-                                  AND t.block_data IS NOT NULL
-                                  AND TRIM(t.block_data) NOT IN ('', '{}', '[]', 'null')
-                            THEN 1 ELSE 0 END) AS completed_elements
+                   SUM(CASE WHEN (
+                                  CASE
+                                      WHEN INSTR(b.schema_definition, '"config_fields"') > 0
+                                      THEN SUBSTR(
+                                          b.schema_definition,
+                                          1,
+                                          INSTR(b.schema_definition, '"config_fields"') - 1
+                                      )
+                                      ELSE b.schema_definition
+                                  END LIKE '%"required":true%'
+                                  OR CASE
+                                      WHEN INSTR(b.schema_definition, '"config_fields"') > 0
+                                      THEN SUBSTR(
+                                          b.schema_definition,
+                                          1,
+                                          INSTR(b.schema_definition, '"config_fields"') - 1
+                                      )
+                                      ELSE b.schema_definition
+                                  END LIKE '%"required": true%'
+                                  OR EXISTS (
+                                      SELECT 1
+                                      FROM cms_block_instance_translations any_t
+                                      WHERE any_t.instance_id = r.id
+                                        AND any_t.block_data IS NOT NULL
+                                        AND TRIM(any_t.block_data) NOT IN ('', '{}', '[]', 'null')
+                                  )
+                              )
+                              THEN CASE WHEN t.id IS NOT NULL
+                                             AND t.block_data IS NOT NULL
+                                             AND TRIM(t.block_data) NOT IN ('', '{}', '[]', 'null')
+                                        THEN 1 ELSE 0 END
+                              ELSE 1 END) AS completed_elements
             FROM active_languages languages
             CROSS JOIN cms_block_instances r
             INNER JOIN cms_content_blocks b

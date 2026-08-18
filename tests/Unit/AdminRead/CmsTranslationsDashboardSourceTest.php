@@ -70,6 +70,120 @@ final class CmsTranslationsDashboardSourceTest extends CIUnitTestCase
         $this->assertSame(0, $stats[1]['percentage']);
     }
 
+    public function testOptionalEmptyBlocksMatchTheAuditCompletionRule(): void
+    {
+        $this->readDb->table('cms_content_blocks')->insertBatch([
+            [
+                'id' => 1,
+                'schema_definition' => json_encode([
+                    'fields' => ['body' => ['type' => 'text']],
+                ], JSON_THROW_ON_ERROR),
+            ],
+            [
+                'id' => 2,
+                'schema_definition' => json_encode([
+                    'fields' => ['body' => ['type' => 'text', 'required' => true]],
+                ], JSON_THROW_ON_ERROR),
+            ],
+        ]);
+        $this->readDb->table('cms_block_instances')->insertBatch([
+            ['id' => 1, 'block_id' => 1, 'is_active' => 1],
+            ['id' => 2, 'block_id' => 2, 'is_active' => 1],
+        ]);
+
+        $stats = (new CmsTranslationsDashboardSource($this->readDb))->read(
+            ['cms.languages.read'],
+            'unused-token',
+        )['sections']['translations'];
+
+        // The optional empty block has no translation work. The required
+        // block is missing in both languages and remains incomplete.
+        $this->assertSame(2, $stats[0]['total_elements']);
+        $this->assertSame(1, $stats[0]['completed_elements']);
+        $this->assertSame(50, $stats[0]['percentage']);
+        $this->assertSame(1, $stats[1]['completed_elements']);
+    }
+
+    public function testRequiredConfigFieldsDoNotMakeOptionalBlocksActionable(): void
+    {
+        $this->readDb->table('cms_content_blocks')->insert([
+            'id' => 3,
+            'schema_definition' => json_encode([
+                'fields' => ['body' => ['type' => 'text']],
+                'config_fields' => [
+                    'source_type' => ['type' => 'select', 'required' => true],
+                ],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        $this->readDb->table('cms_block_instances')->insert([
+            'id' => 3,
+            'block_id' => 3,
+            'is_active' => 1,
+        ]);
+
+        $stats = (new CmsTranslationsDashboardSource($this->readDb))->read(
+            ['cms.languages.read'],
+            'unused-token',
+        )['sections']['translations'];
+
+        // The required configuration is not an auditable translation field.
+        $this->assertSame(1, $stats[0]['total_elements']);
+        $this->assertSame(1, $stats[0]['completed_elements']);
+        $this->assertSame(100, $stats[0]['percentage']);
+        $this->assertSame(1, $stats[1]['completed_elements']);
+    }
+
+    public function testFormFieldOnlyAuditsItsCanonicalLabelField(): void
+    {
+        $this->readDb->table('cms_form_fields')->insert(['id' => 7]);
+        $this->readDb->table('cms_form_field_translations')->insertBatch([
+            [
+                'form_field_id' => 7,
+                'language_id' => 1,
+                'label' => 'Nombre',
+                'placeholder' => 'Escribe tu nombre',
+            ],
+            [
+                'form_field_id' => 7,
+                'language_id' => 2,
+                'label' => 'Name',
+                'placeholder' => null,
+            ],
+        ]);
+
+        $stats = (new CmsTranslationsDashboardSource($this->readDb))->read(
+            ['cms.languages.read'],
+            'unused-token',
+        )['sections']['translations'];
+
+        // Placeholder/help/error metadata is not part of the canonical
+        // sitewide audit for form fields, so it cannot lower EN coverage.
+        $this->assertSame(100, $stats[0]['percentage']);
+        $this->assertSame(100, $stats[1]['percentage']);
+    }
+
+    public function testDefaultSettingsRequireAValueLikeTheAudit(): void
+    {
+        $this->readDb->table('cms_settings')->insert([
+            'id' => 12,
+            'is_translatable' => 1,
+            'setting_value' => null,
+        ]);
+        $this->readDb->table('cms_setting_translations')->insert([
+            'setting_id' => 12,
+            'language_id' => 2,
+            'setting_value' => 'Translated value',
+        ]);
+
+        $stats = (new CmsTranslationsDashboardSource($this->readDb))->read(
+            ['cms.languages.read'],
+            'unused-token',
+        )['sections']['translations'];
+
+        $this->assertSame(0, $stats[0]['completed_elements']);
+        $this->assertSame(100, $stats[1]['percentage']);
+    }
+
     /** @return array<string, string> */
     private function schema(): array
     {
@@ -93,7 +207,7 @@ final class CmsTranslationsDashboardSourceTest extends CIUnitTestCase
             'cms_form_translations' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, form_id INTEGER, language_id INTEGER, name TEXT, submit_label TEXT, description TEXT, success_message TEXT, error_message TEXT',
             'cms_form_fields' => 'id INTEGER PRIMARY KEY',
             'cms_form_field_translations' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, form_field_id INTEGER, language_id INTEGER, label TEXT, placeholder TEXT, help_text TEXT, option_labels TEXT, error_required TEXT, error_invalid TEXT',
-            'cms_settings' => 'id INTEGER PRIMARY KEY, is_translatable INTEGER',
+            'cms_settings' => 'id INTEGER PRIMARY KEY, is_translatable INTEGER, setting_value TEXT',
             'cms_setting_translations' => 'id INTEGER PRIMARY KEY AUTOINCREMENT, setting_id INTEGER, language_id INTEGER, setting_value TEXT',
             'cms_block_instances' => 'id INTEGER PRIMARY KEY, block_id INTEGER, is_active INTEGER',
             'cms_content_blocks' => 'id INTEGER PRIMARY KEY, schema_definition TEXT',
