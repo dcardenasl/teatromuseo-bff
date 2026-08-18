@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace App\AdminRead\Files;
 
 use App\AdminRead\Contracts\AdminFileUsageSourceInterface;
+use App\AdminRead\Support\PermissionGuard;
 use App\AdminRead\Support\ReadOnlyQuery;
 use App\Libraries\Hub\HubClient;
 use CodeIgniter\Database\BaseConnection;
-use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 
 /** Hub + CMS file-usage reader with stable, context-aware deduplication. */
 final class AdminFileUsageSource implements AdminFileUsageSourceInterface
 {
+    /** Defensive cap: a single heavily-reused file (e.g. a hero image) should
+     * never be able to return an unbounded number of usage rows. */
+    private const MAX_USAGES = 500;
+
+    /** @param BaseConnection<mixed,mixed> $cmsDb */
     public function __construct(
         private readonly HubClient $hubClient,
         private readonly BaseConnection $cmsDb,
@@ -25,7 +30,7 @@ final class AdminFileUsageSource implements AdminFileUsageSourceInterface
      */
     public function readHub(int $fileId, string $bearerToken, array $permissions): array
     {
-        $this->requirePermission($permissions, 'files.read');
+        PermissionGuard::require($permissions, 'files.read');
 
         $payload = $this->hubClient->get('/api/v1/files/' . $fileId . '/usages', $bearerToken);
         $rows    = is_array($payload['usages'] ?? null) ? $payload['usages'] : $payload;
@@ -39,7 +44,7 @@ final class AdminFileUsageSource implements AdminFileUsageSourceInterface
      */
     public function readCms(int $fileId, array $permissions): array
     {
-        $this->requirePermission($permissions, 'cms.entries.read');
+        PermissionGuard::require($permissions, 'cms.entries.read');
 
         if (! $this->cmsDb->tableExists('cms_file_references')) {
             throw new \RuntimeException('CMS file usage registry is unavailable.');
@@ -53,7 +58,8 @@ final class AdminFileUsageSource implements AdminFileUsageSourceInterface
                 ->where('fr.hub_file_id', $fileId)
                 ->orderBy('fr.resource_type', 'ASC')
                 ->orderBy('fr.resource_id', 'ASC')
-                ->orderBy('fr.role', 'ASC'),
+                ->orderBy('fr.role', 'ASC')
+                ->limit(self::MAX_USAGES),
             'CMS file usages',
         );
 
@@ -111,14 +117,6 @@ final class AdminFileUsageSource implements AdminFileUsageSourceInterface
         }
 
         return array_values($merged);
-    }
-
-    /** @param list<string> $permissions */
-    private function requirePermission(array $permissions, string $permission): void
-    {
-        if (! in_array($permission, $permissions, true)) {
-            throw new AuthorizationException('The ' . $permission . ' permission is required.');
-        }
     }
 
     /**

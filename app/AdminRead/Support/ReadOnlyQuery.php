@@ -6,6 +6,7 @@ namespace App\AdminRead\Support;
 
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Database\BaseResult;
 use RuntimeException;
 
 /**
@@ -45,13 +46,18 @@ final class ReadOnlyQuery
      * errors. Table names passed to this helper must come from source-owned
      * constants; values belong in the bindings array.
      *
+     * @param BaseConnection<mixed,mixed> $db
      * @param list<mixed> $bindings
      * @return list<array<string, mixed>>
      */
     public static function sql(BaseConnection $db, string $sql, array $bindings, string $label): array
     {
         $result = $db->query($sql, $bindings);
-        if ($result === false) {
+        // `query()` returns `BaseResult|bool|Query`; a SELECT always yields a
+        // `BaseResult` here (this class only ever runs read queries) — `bool`
+        // means the query failed, and `Query` is CI4's non-executed-query
+        // shape, neither of which carries a result set to read.
+        if (! $result instanceof BaseResult) {
             throw new RuntimeException(sprintf('Admin dashboard query failed for %s.', $label));
         }
 

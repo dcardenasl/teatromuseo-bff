@@ -7,6 +7,9 @@ namespace App\AdminRead\Contracts;
 /** Permission-aware Catalog collection-item workspace reader. */
 interface AdminCatalogCollectionItemSourceInterface
 {
-    /** @return array<string, mixed> */
+    /**
+     * @param list<string> $permissions
+     * @return array<string, mixed>
+     */
     public function workspace(?int $itemId, array $permissions): array;
 }

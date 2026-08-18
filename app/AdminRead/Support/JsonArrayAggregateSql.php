@@ -19,6 +19,7 @@ final class JsonArrayAggregateSql
     private const GROUP_CONCAT_MAX_LENGTH = 1048576;
 
     /**
+     * @param BaseConnection<mixed,mixed> $db
      * @return array{aggregate: string, object: string, suffix: string}
      */
     public static function forDatabase(BaseConnection $db): array

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\AdminRead\Catalog;
 
 use App\AdminRead\Contracts\AdminCatalogCollectionItemSourceInterface;
+use App\AdminRead\Support\CmsLanguageOptions;
 use App\AdminRead\Support\JsonArrayAggregateSql;
+use App\AdminRead\Support\JsonProjectionDecoder;
+use App\AdminRead\Support\PermissionGuard;
 use App\AdminRead\Support\ReadOnlyQuery;
 use CodeIgniter\Database\BaseConnection;
-use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 use RuntimeException;
 
 /**
@@ -22,16 +24,20 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
 {
     private const MAX_OPTIONS = 500;
 
-    /** @param BaseConnection<mixed,mixed> $catalogDb @param BaseConnection<mixed,mixed> $cmsDb */
+    /**
+     * @param BaseConnection<mixed,mixed> $catalogDb
+     * @param BaseConnection<mixed,mixed> $cmsDb
+     */
     public function __construct(
         private readonly BaseConnection $catalogDb,
         private readonly BaseConnection $cmsDb,
     ) {
     }
 
+    /** @param list<string> $permissions */
     public function workspace(?int $itemId, array $permissions): array
     {
-        $this->requirePermission($permissions, 'catalog.collectionItem.read');
+        PermissionGuard::require($permissions, 'catalog.collectionItem.read');
         if ($itemId !== null && $itemId < 1) {
             throw new RuntimeException('A positive Catalog item identifier is required.');
         }
@@ -123,7 +129,7 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
         $row['is_active'] = (bool) ($row['is_active'] ?? false);
         $row['show_in_totem'] = (bool) ($row['show_in_totem'] ?? false);
         $row['translations'] = $this->translations($row['translations_json'] ?? null);
-        $row['techniques'] = $this->decodeList($row['techniques_json'] ?? null);
+        $row['techniques'] = JsonProjectionDecoder::decodeList($row['techniques_json'] ?? null);
         foreach ($row['techniques'] as &$technique) {
             $technique['id'] = (int) ($technique['id'] ?? 0);
             $technique['sort_order'] = (int) ($technique['sort_order'] ?? 0);
@@ -145,7 +151,7 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
             ->limit(self::MAX_OPTIONS)
             ->get();
 
-        return $query !== false ? $query->getResultArray() : [];
+        return $query !== false ? array_values($query->getResultArray()) : [];
     }
 
     /** @return list<array<string,mixed>> */
@@ -159,32 +165,19 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
             ->limit(self::MAX_OPTIONS)
             ->get();
 
-        return $query !== false ? $query->getResultArray() : [];
+        return $query !== false ? array_values($query->getResultArray()) : [];
     }
 
     /** @return list<array<string,mixed>> */
     private function languages(): array
     {
-        $query = $this->cmsDb->table('cms_languages')
-            ->select('id, code, name, native_name, is_default, sort_order')
-            ->where('is_active', 1)
-            ->orderBy('sort_order', 'ASC')
-            ->orderBy('id', 'ASC')
-            ->get();
-        $rows = $query !== false ? $query->getResultArray() : [];
-        foreach ($rows as &$row) {
-            $row['id'] = (int) ($row['id'] ?? 0);
-            $row['is_default'] = (bool) ($row['is_default'] ?? false);
-        }
-        unset($row);
-
-        return $rows;
+        return CmsLanguageOptions::list($this->cmsDb);
     }
 
     /** @return list<array<string,mixed>> */
     private function translations(mixed $value): array
     {
-        $rows = $this->decodeList($value);
+        $rows = JsonProjectionDecoder::decodeList($value);
         $grouped = [];
         foreach ($rows as $row) {
             $locale = strtolower(trim((string) ($row['locale'] ?? '')));
@@ -200,27 +193,5 @@ final class AdminCatalogCollectionItemSource implements AdminCatalogCollectionIt
         }
 
         return array_values($grouped);
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function decodeList(mixed $value): array
-    {
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            $value = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
-        }
-        if (! is_array($value)) {
-            return [];
-        }
-
-        return array_values(array_filter($value, 'is_array'));
-    }
-
-    /** @param list<string> $permissions */
-    private function requirePermission(array $permissions, string $permission): void
-    {
-        if (! in_array($permission, $permissions, true)) {
-            throw new AuthorizationException('The ' . $permission . ' permission is required.');
-        }
     }
 }

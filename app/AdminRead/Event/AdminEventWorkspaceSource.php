@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\AdminRead\Event;
 
 use App\AdminRead\Contracts\AdminEventWorkspaceSourceInterface;
+use App\AdminRead\Support\CmsLanguageOptions;
 use App\AdminRead\Support\JsonArrayAggregateSql;
+use App\AdminRead\Support\JsonProjectionDecoder;
+use App\AdminRead\Support\PermissionGuard;
 use App\AdminRead\Support\ReadOnlyQuery;
 use CodeIgniter\Database\BaseConnection;
-use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 use RuntimeException;
 
 /** One-read Event editor workspace; occurrences remain a separate lookup seam. */
@@ -16,16 +18,20 @@ final class AdminEventWorkspaceSource implements AdminEventWorkspaceSourceInterf
 {
     private const MAX_TYPES = 250;
 
-    /** @param BaseConnection<mixed,mixed> $eventDb @param BaseConnection<mixed,mixed> $cmsDb */
+    /**
+     * @param BaseConnection<mixed,mixed> $eventDb
+     * @param BaseConnection<mixed,mixed> $cmsDb
+     */
     public function __construct(
         private readonly BaseConnection $eventDb,
         private readonly BaseConnection $cmsDb,
     ) {
     }
 
+    /** @param list<string> $permissions */
     public function workspace(?int $eventId, array $permissions): array
     {
-        $this->requirePermission($permissions, 'event.events.read');
+        PermissionGuard::require($permissions, 'event.events.read');
         if ($eventId !== null && $eventId < 1) {
             throw new RuntimeException('A positive Event identifier is required.');
         }
@@ -97,7 +103,7 @@ final class AdminEventWorkspaceSource implements AdminEventWorkspaceSourceInterf
         $event['id'] = (int) ($event['id'] ?? 0);
         $event['translations'] = $this->translations($event['translations_json'] ?? null);
         $event['slugs'] = [];
-        foreach ($this->decodeList($event['slugs_json'] ?? null) as $slug) {
+        foreach (JsonProjectionDecoder::decodeList($event['slugs_json'] ?? null) as $slug) {
             $locale = strtolower(trim((string) ($slug['locale'] ?? '')));
             if ($locale !== '') {
                 $event['slugs'][$locale] = (string) ($slug['slug'] ?? '');
@@ -124,33 +130,20 @@ final class AdminEventWorkspaceSource implements AdminEventWorkspaceSourceInterf
             ->limit(self::MAX_TYPES)
             ->get();
 
-        return $query !== false ? $query->getResultArray() : [];
+        return $query !== false ? array_values($query->getResultArray()) : [];
     }
 
     /** @return list<array<string,mixed>> */
     private function languages(): array
     {
-        $query = $this->cmsDb->table('cms_languages')
-            ->select('id, code, name, native_name, is_default, sort_order')
-            ->where('is_active', 1)
-            ->orderBy('sort_order', 'ASC')
-            ->orderBy('id', 'ASC')
-            ->get();
-        $rows = $query !== false ? $query->getResultArray() : [];
-        foreach ($rows as &$row) {
-            $row['id'] = (int) ($row['id'] ?? 0);
-            $row['is_default'] = (bool) ($row['is_default'] ?? false);
-        }
-        unset($row);
-
-        return $rows;
+        return CmsLanguageOptions::list($this->cmsDb);
     }
 
     /** @return list<array<string,mixed>> */
     private function translations(mixed $value): array
     {
         $grouped = [];
-        foreach ($this->decodeList($value) as $row) {
+        foreach (JsonProjectionDecoder::decodeList($value) as $row) {
             $locale = strtolower(trim((string) ($row['locale'] ?? '')));
             $field = trim((string) ($row['field'] ?? ''));
             if ($locale === '' || $field === '') {
@@ -162,27 +155,5 @@ final class AdminEventWorkspaceSource implements AdminEventWorkspaceSourceInterf
         }
 
         return array_values($grouped);
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function decodeList(mixed $value): array
-    {
-        if (is_string($value)) {
-            $decoded = json_decode($value, true);
-            $value = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
-        }
-        if (! is_array($value)) {
-            return [];
-        }
-
-        return array_values(array_filter($value, 'is_array'));
-    }
-
-    /** @param list<string> $permissions */
-    private function requirePermission(array $permissions, string $permission): void
-    {
-        if (! in_array($permission, $permissions, true)) {
-            throw new AuthorizationException('The ' . $permission . ' permission is required.');
-        }
     }
 }
