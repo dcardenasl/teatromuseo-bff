@@ -58,15 +58,15 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         $sections = $this->readDb !== null
             ? $this->directEntryFormOptions($permissions)
             : [
-                'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
-                'collections' => $this->items('/cms/collections?limit=100&is_active=1', $bearerToken),
+                'languages'   => $this->items('/api/v1/cms/languages?limit=100&is_active=1', $bearerToken),
+                'collections' => $this->items('/api/v1/cms/collections?limit=100&is_active=1', $bearerToken),
             ];
 
         if ($this->readDb === null && in_array('cms.categories.read', $permissions, true)) {
-            $sections['categories'] = $this->items('/cms/categories?per_page=1000&projection=list', $bearerToken);
+            $sections['categories'] = $this->items('/api/v1/cms/categories?per_page=1000&projection=list', $bearerToken);
         }
         if ($this->readDb === null && in_array('cms.tags.read', $permissions, true)) {
-            $sections['tags'] = $this->items('/cms/tags?per_page=1000&projection=list', $bearerToken);
+            $sections['tags'] = $this->items('/api/v1/cms/tags?per_page=1000&projection=list', $bearerToken);
         }
 
         $this->cache->save($cacheKey, $sections, self::CACHE_TTL);
@@ -99,9 +99,9 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         $sections = $this->readDb !== null
             ? $this->directPageFormOptions()
             : [
-                'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
-                'pages'       => $this->items('/cms/pages?limit=250', $bearerToken),
-                'collections' => $this->items('/cms/collections?limit=200&is_active=1&projection=list', $bearerToken),
+                'languages'   => $this->items('/api/v1/cms/languages?limit=100&is_active=1', $bearerToken),
+                'pages'       => $this->items('/api/v1/cms/pages?limit=250', $bearerToken),
+                'collections' => $this->items('/api/v1/cms/collections?limit=200&is_active=1&projection=list', $bearerToken),
             ];
 
         $this->cache->save($cacheKey, $sections, self::CACHE_TTL);
@@ -142,16 +142,16 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
             $sections = $this->directMenuEditorBootstrap($menuId, $itemId);
         } else {
             $sections = [
-                'menu'        => $this->data('/cms/menus/' . $menuId, $bearerToken),
-                'items'       => $this->items('/cms/menu-items?menu_id=' . $menuId . '&limit=1000', $bearerToken),
-                'languages'   => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
-                'pages'       => $this->items('/cms/pages?limit=250', $bearerToken),
-                'entries'     => $this->items('/cms/entries?limit=250', $bearerToken),
-                'collections' => $this->items('/cms/collections?limit=100&is_active=1', $bearerToken),
+                'menu'        => $this->data('/api/v1/cms/menus/' . $menuId, $bearerToken),
+                'items'       => $this->items('/api/v1/cms/menu-items?menu_id=' . $menuId . '&limit=1000', $bearerToken),
+                'languages'   => $this->items('/api/v1/cms/languages?limit=100&is_active=1', $bearerToken),
+                'pages'       => $this->items('/api/v1/cms/pages?limit=250', $bearerToken),
+                'entries'     => $this->items('/api/v1/cms/entries?limit=250', $bearerToken),
+                'collections' => $this->items('/api/v1/cms/collections?limit=100&is_active=1', $bearerToken),
             ];
 
             if ($itemId !== null) {
-                $sections['item'] = $this->data('/cms/menu-items/' . $itemId, $bearerToken);
+                $sections['item'] = $this->data('/api/v1/cms/menu-items/' . $itemId, $bearerToken);
             }
         }
 
@@ -181,16 +181,16 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
             ? $this->directSiteIdentityBootstrap()
             : [
                 'settings'  => array_merge(
-                    $this->items('/cms/settings?' . http_build_query([
+                    $this->items('/api/v1/cms/settings?' . http_build_query([
                         'filter' => ['setting_group' => 'identity'],
                         'per_page' => 100,
                     ]), $bearerToken),
-                    $this->items('/cms/settings?' . http_build_query([
+                    $this->items('/api/v1/cms/settings?' . http_build_query([
                         'filter' => ['setting_group' => 'social'],
                         'per_page' => 100,
                     ]), $bearerToken),
                 ),
-                'languages' => $this->items('/cms/languages?limit=100&is_active=1', $bearerToken),
+                'languages' => $this->items('/api/v1/cms/languages?limit=100&is_active=1', $bearerToken),
             ];
 
         $this->cache->save($cacheKey, $sections, self::CACHE_TTL);

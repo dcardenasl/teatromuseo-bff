@@ -45,13 +45,24 @@ final class CmsAdminBootstrapSourceTest extends CIUnitTestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['get'])
             ->getMock();
+        $paths = [];
         $client->expects($this->exactly(4))
             ->method('get')
-            ->willReturn(['data' => []]);
+            ->willReturnCallback(static function (string $path, string $token) use (&$paths): array {
+                $paths[] = [$path, $token];
+
+                return ['data' => []];
+            });
 
         $result = (new AdminCmsBootstrapSource($client, $cache))->entryFormOptions(7, $permissions, 'token');
 
         $this->assertSame(['languages', 'collections', 'categories', 'tags'], array_keys($result));
+        $this->assertSame([
+            ['/api/v1/cms/languages?limit=100&is_active=1', 'token'],
+            ['/api/v1/cms/collections?limit=100&is_active=1', 'token'],
+            ['/api/v1/cms/categories?per_page=1000&projection=list', 'token'],
+            ['/api/v1/cms/tags?per_page=1000&projection=list', 'token'],
+        ], $paths);
     }
 
     public function testReturnsCachedPageOptionsWithoutCallingTheDomain(): void
