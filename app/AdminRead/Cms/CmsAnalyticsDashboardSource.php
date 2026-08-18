@@ -13,6 +13,7 @@ final class CmsAnalyticsDashboardSource implements AdminDashboardSourceInterface
 {
     private const PERIOD = '7d';
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }

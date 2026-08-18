@@ -105,6 +105,7 @@ final class CmsTranslationsDashboardSource implements AdminDashboardTranslations
         ],
     ];
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }

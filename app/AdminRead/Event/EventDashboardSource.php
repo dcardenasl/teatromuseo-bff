@@ -11,18 +11,29 @@ use CodeIgniter\Database\BaseConnection;
 /** Permission-aware Event dashboard projection over the Event database. */
 final class EventDashboardSource implements AdminDashboardSourceInterface
 {
-    /** @var array<string, array{table: string, permission: string, title: string, activity: bool, soft_delete: bool}> */
-    private const RESOURCES = [
-        'events' => ['table' => 'events', 'permission' => 'event.events.read', 'title' => 'title', 'activity' => true, 'soft_delete' => true],
-        'event_types' => ['table' => 'event_types', 'permission' => 'event.event-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
-        'venues' => ['table' => 'venues', 'permission' => 'event.venues.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
-        'occurrences' => ['table' => 'occurrences', 'permission' => 'event.occurrences.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
-        'event_references' => ['table' => 'event_references', 'permission' => 'event.event-references.read', 'title' => '', 'activity' => false, 'soft_delete' => true],
-        'ticket_types' => ['table' => 'ticket_types', 'permission' => 'event.ticket-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
-        'bookings' => ['table' => 'bookings', 'permission' => 'event.bookings.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
-        'tickets' => ['table' => 'tickets', 'permission' => 'event.tickets.read', 'title' => 'holder_name', 'activity' => true, 'soft_delete' => true],
-    ];
+    /**
+     * A method (not a `const`) so `soft_delete` keeps its declared `bool`
+     * type instead of PHPStan narrowing it to the literal `true` every
+     * current entry happens to share — it is a genuine per-resource flag for
+     * future entries, not an always-true dead branch.
+     *
+     * @return array<string, array{table: string, permission: string, title: string, activity: bool, soft_delete: bool}>
+     */
+    private static function resources(): array
+    {
+        return [
+            'events' => ['table' => 'events', 'permission' => 'event.events.read', 'title' => 'title', 'activity' => true, 'soft_delete' => true],
+            'event_types' => ['table' => 'event_types', 'permission' => 'event.event-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+            'venues' => ['table' => 'venues', 'permission' => 'event.venues.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+            'occurrences' => ['table' => 'occurrences', 'permission' => 'event.occurrences.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
+            'event_references' => ['table' => 'event_references', 'permission' => 'event.event-references.read', 'title' => '', 'activity' => false, 'soft_delete' => true],
+            'ticket_types' => ['table' => 'ticket_types', 'permission' => 'event.ticket-types.read', 'title' => 'name', 'activity' => true, 'soft_delete' => true],
+            'bookings' => ['table' => 'bookings', 'permission' => 'event.bookings.read', 'title' => 'status', 'activity' => true, 'soft_delete' => true],
+            'tickets' => ['table' => 'tickets', 'permission' => 'event.tickets.read', 'title' => 'holder_name', 'activity' => true, 'soft_delete' => true],
+        ];
+    }
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }
@@ -34,7 +45,7 @@ final class EventDashboardSource implements AdminDashboardSourceInterface
     public function read(array $permissions): array
     {
         $branches = [];
-        foreach (self::RESOURCES as $type => $resource) {
+        foreach (self::resources() as $type => $resource) {
             if (! in_array($resource['permission'], $permissions, true)) {
                 continue;
             }

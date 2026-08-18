@@ -127,6 +127,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
      * trip. Each relation is reduced by the database engine first and then
      * joined to the owner row; PHP only decodes the already-shaped JSON.
      *
+     * @param list<string> $permissions
      * @return array<string, mixed>|null
      */
     private function workspaceProjection(string $ownerType, int $ownerId, array $permissions): ?array
@@ -801,7 +802,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         ];
     }
 
-    /** @param list<array<string, mixed>> $collections @return array<int, string> */
+    /**
+     * @param list<array<string, mixed>> $collections
+     * @return array<int, string>
+     */
     private function collectionNames(array $collections): array
     {
         $names = [];
@@ -827,7 +831,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         return array_values(array_filter($decoded, 'is_array'));
     }
 
-    /** @param list<array<string, mixed>> $collections @return array<string, int> */
+    /**
+     * @param list<array<string, mixed>> $collections
+     * @return array<string, int>
+     */
     private function collectionsMap(array $collections): array
     {
         $map = [];
@@ -910,7 +917,13 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                 $collectionKeys[] = $key;
             }
             if ($id > 0) {
-                $collectionIds[] = ['value' => $id, 'label' => (string) ($collection['name'] ?? $key ?? $id)];
+                // $key is always a defined string (never null, just possibly
+                // '' when collection_key is missing) — `?? $id` never ran as
+                // a fallback for an empty key, so an empty collection_key
+                // used to produce an empty label instead of falling back to
+                // the id.
+                $label = $collection['name'] ?? ($key !== '' ? $key : $id);
+                $collectionIds[] = ['value' => $id, 'label' => (string) $label];
             }
         }
         $pages = $preloadedPages;
@@ -989,7 +1002,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         return $blockTypes;
     }
 
-    /** @param array<string, mixed> $fields @param list<mixed> $options */
+    /**
+     * @param array<string, mixed> $fields
+     * @param list<mixed> $options
+     */
     private function setSelectOptions(array &$fields, string $key, array $options): void
     {
         if (! isset($fields[$key]) || ! is_array($fields[$key])) {
@@ -999,7 +1015,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         $fields[$key]['options'] = $options;
     }
 
-    /** @param list<array<string, mixed>> $rows @param list<string> $fallbackKeys @return list<array{value: string, label: string}> */
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param list<string> $fallbackKeys
+     * @return list<array{value: string, label: string}>
+     */
     private function optionRows(array $rows, array $fallbackKeys): array
     {
         $options = [];
@@ -1057,7 +1077,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         return $catalog;
     }
 
-    /** @param list<array<string, mixed>> $blocks @return array<string, mixed>|null */
+    /**
+     * @param list<array<string, mixed>> $blocks
+     * @return array<string, mixed>|null
+     */
     private function findBlock(array $blocks, int $instanceId): ?array
     {
         foreach ($blocks as $block) {
@@ -1086,7 +1109,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         return array_values(array_unique($ids));
     }
 
-    /** @param list<string> $permissions @return list<int> */
+    /**
+     * @param list<string> $permissions
+     * @return list<int>
+     */
     private function workspaceBindings(int $ownerId, string $ownerType, array $permissions): array
     {
         $bindings = [$ownerId, $ownerId, $ownerId, $ownerId];

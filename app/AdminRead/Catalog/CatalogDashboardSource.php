@@ -11,28 +11,39 @@ use CodeIgniter\Database\BaseConnection;
 /** Permission-aware Catalog dashboard projection over the Catalog database. */
 final class CatalogDashboardSource implements AdminDashboardSourceInterface
 {
-    /** @var array<string, array{table: string, permission: string, soft_delete: bool, slug: bool}> */
-    private const RESOURCES = [
-        'collection_items' => [
-            'table' => 'collection_items',
-            'permission' => 'catalog.collectionItem.read',
-            'soft_delete' => true,
-            'slug' => false,
-        ],
-        'categories' => [
-            'table' => 'categories',
-            'permission' => 'catalog.category.read',
-            'soft_delete' => true,
-            'slug' => true,
-        ],
-        'techniques' => [
-            'table' => 'techniques',
-            'permission' => 'catalog.technique.read',
-            'soft_delete' => true,
-            'slug' => true,
-        ],
-    ];
+    /**
+     * A method (not a `const`) so the `bool` fields keep their declared type
+     * instead of PHPStan narrowing them to the literal `true` every current
+     * entry happens to share — `soft_delete`/`slug` are genuinely per-resource
+     * flags for future entries, not always-true dead branches.
+     *
+     * @return array<string, array{table: string, permission: string, soft_delete: bool, slug: bool}>
+     */
+    private static function resources(): array
+    {
+        return [
+            'collection_items' => [
+                'table' => 'collection_items',
+                'permission' => 'catalog.collectionItem.read',
+                'soft_delete' => true,
+                'slug' => false,
+            ],
+            'categories' => [
+                'table' => 'categories',
+                'permission' => 'catalog.category.read',
+                'soft_delete' => true,
+                'slug' => true,
+            ],
+            'techniques' => [
+                'table' => 'techniques',
+                'permission' => 'catalog.technique.read',
+                'soft_delete' => true,
+                'slug' => true,
+            ],
+        ];
+    }
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }
@@ -44,7 +55,7 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
     public function read(array $permissions): array
     {
         $branches = [];
-        foreach (self::RESOURCES as $type => $resource) {
+        foreach (self::resources() as $type => $resource) {
             if (! in_array($resource['permission'], $permissions, true)) {
                 continue;
             }

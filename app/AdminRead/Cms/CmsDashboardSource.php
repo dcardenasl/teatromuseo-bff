@@ -22,6 +22,7 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
         'forms' => ['table' => 'cms_forms', 'permission' => 'cms.forms.read', 'soft_delete' => false],
     ];
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }

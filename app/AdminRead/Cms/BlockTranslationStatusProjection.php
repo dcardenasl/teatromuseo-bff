@@ -167,7 +167,10 @@ final class BlockTranslationStatusProjection
         return $definitions;
     }
 
-    /** @param array<int, array<string, mixed>> $translations @param array<string, array<string, mixed>> $fieldDefinitions */
+    /**
+     * @param array<int, array<string, mixed>> $translations
+     * @param array<string, array<string, mixed>> $fieldDefinitions
+     */
     private function shouldReportMissing(array $translations, array $fieldDefinitions): bool
     {
         foreach ($fieldDefinitions as $definition) {
@@ -187,7 +190,12 @@ final class BlockTranslationStatusProjection
         return false;
     }
 
-    /** @param array<string, mixed>|null $translation @param array<int, array<string, mixed>> $translations @param array<string, array<string, mixed>> $fieldDefinitions */
+    /**
+     * @param array<string, mixed>|null $translation
+     * @param array<int, array<string, mixed>> $translations
+     * @param array<string, array<string, mixed>> $fieldDefinitions
+     * @return array{0: string, 1: string}
+     */
     private function evaluate(?array $translation, array $translations, array $fieldDefinitions, int $languageId, ?string $resourceUpdatedAt, ?int $defaultLanguageId): array
     {
         if ($translation === null) {
@@ -253,7 +261,10 @@ final class BlockTranslationStatusProjection
         return ['complete', ''];
     }
 
-    /** @param array<string, mixed> $translation @param array<string, mixed> $definition */
+    /**
+     * @param array<string, mixed> $translation
+     * @param array<string, mixed> $definition
+     */
     private function fieldValue(array $translation, string $key, array $definition): mixed
     {
         $data = $translation['block_data'] ?? [];

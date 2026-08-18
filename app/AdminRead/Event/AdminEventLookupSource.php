@@ -30,6 +30,7 @@ final class AdminEventLookupSource implements AdminEventLookupSourceInterface
         'event_reference' => ['event.events.read'],
     ];
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(
         private readonly BaseConnection $db,
         private readonly CacheInterface $cache,

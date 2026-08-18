@@ -7,6 +7,11 @@ parameters:
         - app/Libraries
         - app/Filters
         - app/PublicRead
+        - app/AdminRead
+        - app/Support
+        - app/Helpers
+        - app/Models
+        - app/Validations
     parallel:
         jobSize: 20
         processTimeout: 600.0

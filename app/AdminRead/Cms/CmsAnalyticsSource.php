@@ -18,6 +18,7 @@ final class CmsAnalyticsSource implements AdminAnalyticsSourceInterface
 
     private const TOP_LIMIT = 10;
 
+    /** @param BaseConnection<mixed,mixed> $db */
     public function __construct(private readonly BaseConnection $db)
     {
     }

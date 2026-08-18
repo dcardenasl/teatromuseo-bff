@@ -26,6 +26,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
 {
     private const CACHE_TTL = 30;
 
+    /** @param ?BaseConnection<mixed,mixed> $readDb */
     public function __construct(
         private readonly DomainClient $client,
         private readonly CacheInterface $cache,
@@ -198,7 +199,10 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         return $sections;
     }
 
-    /** @param list<string> $permissions */
+    /**
+     * @param list<string> $permissions
+     * @param list<string> $required
+     */
     private function requirePermissions(array $permissions, array $required): void
     {
         foreach ($required as $permission) {
@@ -361,7 +365,10 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         return compact('languages', 'pages', 'collections');
     }
 
-    /** @param list<string> $permissions */
+    /**
+     * @param list<string> $permissions
+     * @return array<string, list<array<string, mixed>>>
+     */
     private function directEntryFormOptions(array $permissions): array
     {
         $db = $this->readDb ?? throw new RuntimeException('CMS read connection is not configured.');
@@ -406,6 +413,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         return $sections;
     }
 
+    /** @return array<string, array<string, mixed>|list<array<string, mixed>>> */
     private function directMenuEditorBootstrap(int $menuId, ?int $itemId): array
     {
         $db = $this->readDb ?? throw new RuntimeException('CMS read connection is not configured.');
@@ -490,6 +498,7 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         return $sections;
     }
 
+    /** @return array<string, list<array<string, mixed>>> */
     private function directSiteIdentityBootstrap(): array
     {
         $db = $this->readDb ?? throw new RuntimeException('CMS read connection is not configured.');
@@ -562,7 +571,10 @@ final class AdminCmsBootstrapSource implements AdminCmsBootstrapSourceInterface
         return is_array($decoded) ? $decoded : [];
     }
 
-    /** @param list<string> $booleanFields @return list<array<string, mixed>> */
+    /**
+     * @param list<string> $booleanFields
+     * @return list<array<string, mixed>>
+     */
     private function decodeAndNormalizeList(mixed $value, array $booleanFields): array
     {
         $items = $this->decodeJsonList($value);
