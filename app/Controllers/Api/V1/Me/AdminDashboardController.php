@@ -69,28 +69,4 @@ final class AdminDashboardController extends BaseProxyController
             'sections'     => $sections,
         ]));
     }
-
-    private function extractBearerToken(): ?string
-    {
-        $header = $this->request->getHeaderLine('Authorization');
-        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return null;
-    }
-
-    /** @param list<string> $states */
-    private function overallState(array $states): string
-    {
-        if ($states !== [] && count(array_unique($states)) === 1 && $states[0] === 'ok') {
-            return 'ok';
-        }
-
-        if (in_array('ok', $states, true)) {
-            return 'partial';
-        }
-
-        return 'unavailable';
-    }
 }

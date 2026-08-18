@@ -32,14 +32,4 @@ final class AdminCmsWizardController extends BaseProxyController
             ]));
         }, 'CMS wizard bootstrap source');
     }
-
-    private function extractBearerToken(): ?string
-    {
-        $header = $this->request->getHeaderLine('Authorization');
-        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return null;
-    }
 }

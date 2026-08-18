@@ -70,16 +70,6 @@ final class AdminCmsBootstrapController extends BaseProxyController
         }, 'CMS ' . $context . ' source');
     }
 
-    private function extractBearerToken(): ?string
-    {
-        $header = $this->request->getHeaderLine('Authorization');
-        if (preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return null;
-    }
-
     private function requiredPositiveId(string $value, string $field): int
     {
         $id = $this->optionalPositiveId($value, $field);
