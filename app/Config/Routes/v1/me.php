@@ -33,7 +33,16 @@ $routes->get(
     '\App\Controllers\Api\V1\Me\AdminEventLookupsController::index/$1',
     ['filter' => 'effectivepermissionsauth'],
 );
-
+$routes->get(
+    'me/admin-catalog/collection-items/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCatalogWorkspaceController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-catalog/collection-items/(:num)/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCatalogWorkspaceController::item/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
 $routes->get(
     'me/admin-cms/entry-form-options',
     '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::entryFormOptions',

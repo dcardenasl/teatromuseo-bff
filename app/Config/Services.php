@@ -184,6 +184,15 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::catalogDashboard();
     }
 
+    public static function adminReadCatalogCollectionItemWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogCollectionItemSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogCollectionItemWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogCollectionItemWorkspace();
+    }
+
     public static function adminReadEventDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
     {
         if ($getShared) {

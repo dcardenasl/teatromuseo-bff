@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AdminRead;
 
+use App\AdminRead\Catalog\AdminCatalogCollectionItemSource;
 use App\AdminRead\Catalog\CatalogDashboardSource;
 use App\AdminRead\Cms\AdminCmsBootstrapSource;
 use App\AdminRead\Cms\AdminCmsWizardSource;
@@ -57,6 +58,14 @@ final class AdminReadContainer
     public static function catalogDashboard(): CatalogDashboardSource
     {
         return new CatalogDashboardSource(self::database('catalog_readonly'));
+    }
+
+    public static function catalogCollectionItemWorkspace(): AdminCatalogCollectionItemSource
+    {
+        return new AdminCatalogCollectionItemSource(
+            self::database('catalog_readonly'),
+            self::database('cms_readonly'),
+        );
     }
 
     public static function eventDashboard(): EventDashboardSource
