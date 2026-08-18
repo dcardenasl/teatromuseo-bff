@@ -7,8 +7,6 @@ namespace App\AdminRead\Cms;
 use App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface;
 use App\AdminRead\Support\ReadOnlyQuery;
 use App\PublicRead\Cms\FileUrlResolver;
-use App\Support\RequestTelemetry;
-use CodeIgniter\Cache\CacheInterface;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Exceptions\AuthorizationException;
 use RuntimeException;
@@ -22,13 +20,10 @@ use RuntimeException;
  */
 final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
 {
-    private const CACHE_TTL = 30;
-
     /** @param BaseConnection<mixed, mixed> $db */
     public function __construct(
         private readonly BaseConnection $db,
         private readonly FileUrlResolver $fileUrlResolver,
-        private readonly CacheInterface $cache,
     ) {
     }
 
@@ -65,19 +60,30 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             throw new AuthorizationException('The ' . $permission . ' permission is required.');
         }
 
-        $owner = $ownerType === 'entry' ? $this->entry($ownerId) : $this->page($ownerId);
-        if ($owner === null) {
+        $projection = $this->workspaceProjection($ownerType, $ownerId, $permissions);
+        if ($projection === null) {
             throw new RuntimeException('CMS ' . $ownerType . ' not found.');
         }
 
-        $languages = $this->languages();
-        $blocks = $this->blocks($ownerType, $ownerId);
-        $collections = $this->collections();
-        $blockTypes = $this->withDynamicOptions($this->blockTypes(), $collections, $permissions);
+        $owner = $projection['owner'];
+        $languages = $projection['languages'];
+        $blocks = $projection['blocks'];
+        $collections = $projection['collections'];
+        $pages = $projection['pages'];
+        $entries = $projection['entries'];
+        $blockTypes = $this->withDynamicOptions(
+            $projection['blockTypes'],
+            $collections,
+            $permissions,
+            $projection['forms'],
+            $pages,
+            $entries,
+            $projection['categories'],
+        );
 
         $sections = [
             $ownerType => $owner,
-            'pages' => $this->pageOptions(),
+            'pages' => $pages,
             'collections' => $collections,
             'languages' => $languages,
             'blocks' => $blocks,
@@ -88,7 +94,7 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             'blockTranslationStatus' => [],
         ];
         if ($ownerType === 'entry') {
-            $sections['entries'] = $this->entryOptions();
+            $sections['entries'] = $entries;
         }
 
         if ($instanceId !== null && $instanceId > 0) {
@@ -111,307 +117,595 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         return $sections;
     }
 
-    /** @return array<string, mixed>|null */
-    private function page(int $pageId): ?array
+    /**
+     * Execute the complete CMS workspace projection in one database round
+     * trip. Each relation is reduced by the database engine first and then
+     * joined to the owner row; PHP only decodes the already-shaped JSON.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function workspaceProjection(string $ownerType, int $ownerId, array $permissions): ?array
     {
-        $row = ReadOnlyQuery::rows(
-            $this->db->table('cms_pages')
-                ->select('id, parent_id, collection_id, page_type, status, published_at, scheduled_at, sort_order, sitemap_priority, sitemap_changefreq, is_in_sitemap, created_at, updated_at')
-                ->where('id', $pageId)
-                ->where('deleted_at', null)
-                ->limit(1),
-            'CMS admin page workspace',
-        )[0] ?? null;
+        $isSqlite = str_contains(strtolower((string) $this->db->DBDriver), 'sqlite');
+        $aggregate = $isSqlite ? 'json_group_array' : 'JSON_ARRAYAGG';
+        $object = $isSqlite ? 'json_object' : 'JSON_OBJECT';
+        $emptyArray = "'[]'";
 
+        $pageTranslations = <<<SQL
+            SELECT t.page_id AS resource_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'page_id', t.page_id,
+                       'language_id', t.language_id,
+                       'slug', t.slug,
+                       'title', t.title,
+                       'excerpt', t.excerpt,
+                       'meta_title', t.meta_title,
+                       'meta_description', t.meta_description,
+                       'og_image_file_id', t.og_image_file_id,
+                       'og_image_url', t.og_image_url,
+                       'og_type', t.og_type,
+                       'canonical_url', t.canonical_url,
+                       'robots', t.robots,
+                       'schema_data', t.schema_data,
+                       'created_at', t.created_at,
+                       'updated_at', t.updated_at
+                   )) AS translations_json
+            FROM (
+                SELECT id, page_id, language_id, slug, title, excerpt,
+                       meta_title, meta_description, og_image_file_id,
+                       og_image_url, og_type, canonical_url, robots,
+                       schema_data, created_at, updated_at
+                FROM cms_page_translations
+                WHERE page_id = ?
+                ORDER BY language_id ASC, id ASC
+            ) t
+            GROUP BY t.page_id
+        SQL;
+
+        $entryTranslations = <<<SQL
+            SELECT t.entry_id AS resource_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'entry_id', t.entry_id,
+                       'language_id', t.language_id,
+                       'slug', t.slug,
+                       'title', t.title,
+                       'excerpt', t.excerpt,
+                       'featured_file_id', t.featured_file_id,
+                       'featured_image_url', t.featured_image_url,
+                       'meta_title', t.meta_title,
+                       'meta_description', t.meta_description,
+                       'og_image_file_id', t.og_image_file_id,
+                       'og_type', t.og_type,
+                       'canonical_url', t.canonical_url,
+                       'robots', t.robots,
+                       'schema_data', t.schema_data,
+                       'created_at', t.created_at,
+                       'updated_at', t.updated_at
+                   )) AS translations_json
+            FROM (
+                SELECT id, entry_id, language_id, slug, title, excerpt,
+                       featured_file_id, featured_image_url, meta_title,
+                       meta_description, og_image_file_id, og_type,
+                       canonical_url, robots, schema_data, created_at,
+                       updated_at
+                FROM cms_entry_translations
+                WHERE entry_id = ?
+                ORDER BY language_id ASC, id ASC
+            ) t
+            GROUP BY t.entry_id
+        SQL;
+
+        $blockTranslations = <<<SQL
+            SELECT t.instance_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'instance_id', t.instance_id,
+                       'language_id', t.language_id,
+                       'block_data', t.block_data,
+                       'is_published', t.is_published,
+                       'created_at', t.created_at,
+                       'updated_at', t.updated_at
+                   )) AS translations_json
+            FROM (
+                SELECT t.id, t.instance_id, t.language_id, t.block_data,
+                       t.is_published, t.created_at, t.updated_at
+                FROM cms_block_instance_translations t
+                INNER JOIN (
+                    SELECT id
+                    FROM cms_block_instances
+                    WHERE owner_type = '{$ownerType}'
+                      AND owner_id = ?
+                ) selected_instances ON selected_instances.id = t.instance_id
+                ORDER BY t.instance_id ASC, t.language_id ASC, t.id ASC
+            ) t
+            GROUP BY t.instance_id
+        SQL;
+
+        $blocks = <<<SQL
+            SELECT bi.owner_type,
+                   bi.owner_id,
+                   {$aggregate}({$object}(
+                       'id', bi.id,
+                       'block_id', bi.block_id,
+                       'owner_type', bi.owner_type,
+                       'owner_id', bi.owner_id,
+                       'parent_instance_id', bi.parent_instance_id,
+                       'sort_order', bi.sort_order,
+                       'column_index', bi.column_index,
+                       'is_active', bi.is_active,
+                       'block_config', bi.block_config,
+                       'created_at', bi.created_at,
+                       'updated_at', bi.updated_at,
+                       'translations', COALESCE(bt.translations_json, {$emptyArray})
+                   )) AS blocks_json
+            FROM cms_block_instances bi
+            LEFT JOIN ({$blockTranslations}) bt ON bt.instance_id = bi.id
+            WHERE bi.owner_type = '{$ownerType}'
+              AND bi.owner_id = ?
+            GROUP BY bi.owner_type, bi.owner_id
+        SQL;
+
+        $blockTypes = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', b.id,
+                       'block_key', b.block_key,
+                       'name', b.name,
+                       'description', b.description,
+                       'category', b.category,
+                       'icon', b.icon,
+                       'schema_definition', b.schema_definition,
+                       'supports_pages', b.supports_pages,
+                       'supports_entries', b.supports_entries,
+                       'is_container', b.is_container,
+                       'is_active', b.is_active,
+                       'sort_order', b.sort_order
+                   )) AS block_types_json
+            FROM (
+                SELECT id, block_key, name, description, category, icon,
+                       schema_definition, supports_pages, supports_entries,
+                       is_container, is_active, sort_order
+                FROM cms_content_blocks
+                WHERE is_active = 1
+                ORDER BY sort_order ASC, name ASC, id ASC
+            ) b
+        SQL;
+
+        $languages = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', l.id,
+                       'code', l.code,
+                       'name', l.name,
+                       'native_name', l.native_name,
+                       'is_default', l.is_default,
+                       'is_active', l.is_active,
+                       'fallback_language_id', l.fallback_language_id,
+                       'sort_order', l.sort_order
+                   )) AS languages_json
+            FROM (
+                SELECT id, code, name, native_name, is_default, is_active,
+                       fallback_language_id, sort_order
+                FROM cms_languages
+                WHERE is_active = 1
+                ORDER BY sort_order ASC, id ASC
+            ) l
+        SQL;
+
+        $collectionTranslations = <<<SQL
+            SELECT t.collection_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'collection_id', t.collection_id,
+                       'language_id', t.language_id,
+                       'slug', t.slug,
+                       'name', t.name
+                   )) AS translations_json
+            FROM (
+                SELECT t.id, t.collection_id, t.language_id, t.slug, t.name
+                FROM cms_collection_translations t
+                INNER JOIN (
+                    SELECT id
+                    FROM cms_collections
+                    WHERE is_active = 1
+                    ORDER BY sort_order ASC, id ASC
+                    LIMIT 250
+                ) selected_collections ON selected_collections.id = t.collection_id
+                ORDER BY t.collection_id ASC, t.language_id ASC, t.id ASC
+            ) t
+            GROUP BY t.collection_id
+        SQL;
+
+        $collections = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', c.id,
+                       'collection_key', c.collection_key,
+                       'collection_type', c.collection_type,
+                       'is_active', c.is_active,
+                       'sort_order', c.sort_order,
+                       'translations', COALESCE(ct.translations_json, {$emptyArray})
+                   )) AS collections_json
+            FROM (
+                SELECT c.id, c.collection_key, c.collection_type, c.is_active, c.sort_order
+                FROM cms_collections c
+                WHERE c.is_active = 1
+                ORDER BY c.sort_order ASC, c.id ASC
+                LIMIT 250
+            ) c
+            LEFT JOIN ({$collectionTranslations}) ct ON ct.collection_id = c.id
+        SQL;
+
+        $pageOptionTranslations = <<<SQL
+            SELECT t.page_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'language_id', t.language_id,
+                       'slug', t.slug,
+                       'title', t.title
+                   )) AS translations_json
+            FROM (
+                SELECT t.id, t.page_id, t.language_id, t.slug, t.title
+                FROM cms_page_translations t
+                INNER JOIN (
+                    SELECT id
+                    FROM cms_pages
+                    WHERE deleted_at IS NULL
+                    ORDER BY sort_order ASC, id ASC
+                    LIMIT 250
+                ) selected_pages ON selected_pages.id = t.page_id
+                ORDER BY t.page_id ASC, t.language_id ASC, t.id ASC
+            ) t
+            GROUP BY t.page_id
+        SQL;
+
+        $pages = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', p.id,
+                       'parent_id', p.parent_id,
+                       'collection_id', p.collection_id,
+                       'page_type', p.page_type,
+                       'status', p.status,
+                       'sort_order', p.sort_order,
+                       'created_at', p.created_at,
+                       'updated_at', p.updated_at,
+                       'translations', COALESCE(pt.translations_json, {$emptyArray})
+                   )) AS pages_json
+            FROM (
+                SELECT p.id, p.parent_id, p.collection_id, p.page_type, p.status, p.sort_order, p.created_at, p.updated_at
+                FROM cms_pages p
+                WHERE p.deleted_at IS NULL
+                ORDER BY p.sort_order ASC, p.id ASC
+                LIMIT 250
+            ) p
+            LEFT JOIN ({$pageOptionTranslations}) pt ON pt.page_id = p.id
+        SQL;
+
+        $entryOptionTranslations = <<<SQL
+            SELECT t.entry_id,
+                   {$aggregate}({$object}(
+                       'id', t.id,
+                       'language_id', t.language_id,
+                       'slug', t.slug,
+                       'title', t.title
+                   )) AS translations_json
+            FROM (
+                SELECT t.id, t.entry_id, t.language_id, t.slug, t.title
+                FROM cms_entry_translations t
+                INNER JOIN (
+                    SELECT id
+                    FROM cms_entries
+                    WHERE deleted_at IS NULL
+                    ORDER BY sort_order ASC, id ASC
+                    LIMIT 250
+                ) selected_entries ON selected_entries.id = t.entry_id
+                ORDER BY t.entry_id ASC, t.language_id ASC, t.id ASC
+            ) t
+            GROUP BY t.entry_id
+        SQL;
+
+        $entries = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', e.id,
+                       'collection_id', e.collection_id,
+                       'workflow_status', e.workflow_status,
+                       'published_at', e.published_at,
+                       'sort_order', e.sort_order,
+                       'created_at', e.created_at,
+                       'updated_at', e.updated_at,
+                       'translations', COALESCE(et.translations_json, {$emptyArray})
+                   )) AS entries_json
+            FROM (
+                SELECT e.id, e.collection_id, e.workflow_status, e.published_at, e.sort_order, e.created_at, e.updated_at
+                FROM cms_entries e
+                WHERE e.deleted_at IS NULL
+                ORDER BY e.sort_order ASC, e.id ASC
+                LIMIT 250
+            ) e
+            LEFT JOIN ({$entryOptionTranslations}) et ON et.entry_id = e.id
+        SQL;
+
+        $forms = <<<SQL
+            SELECT {$aggregate}({$object}('form_key', f.form_key)) AS forms_json
+            FROM (
+                SELECT id, form_key
+                FROM cms_forms
+                WHERE is_active = 1
+                ORDER BY form_key ASC, id ASC
+                LIMIT 100
+            ) f
+        SQL;
+
+        $categoryTranslations = <<<SQL
+            SELECT t.category_id,
+                   {$aggregate}({$object}('id', t.id, 'language_id', t.language_id, 'name', t.name)) AS translations_json
+            FROM (
+                SELECT t.id, t.category_id, t.language_id, t.name
+                FROM cms_category_translations t
+                INNER JOIN (
+                    SELECT id
+                    FROM cms_categories
+                    WHERE is_active = 1
+                    ORDER BY sort_order ASC, id ASC
+                    LIMIT 500
+                ) selected_categories ON selected_categories.id = t.category_id
+                ORDER BY t.category_id ASC, t.language_id ASC, t.id ASC
+            ) t
+            GROUP BY t.category_id
+        SQL;
+
+        $categoriesProjection = <<<SQL
+            SELECT {$aggregate}({$object}(
+                       'id', c.id,
+                       'collection_id', c.collection_id,
+                       'translations', COALESCE(ct.translations_json, {$emptyArray})
+                   )) AS categories_json
+            FROM (
+                SELECT c.id, c.collection_id
+                FROM cms_categories c
+                WHERE c.is_active = 1
+                ORDER BY c.sort_order ASC, c.id ASC
+                LIMIT 500
+            ) c
+            LEFT JOIN ({$categoryTranslations}) ct ON ct.category_id = c.id
+        SQL;
+        $categories = in_array('cms.categories.read', $permissions, true)
+            ? $categoriesProjection
+            : "SELECT {$emptyArray} AS categories_json";
+
+        $ownerTable = $ownerType === 'entry' ? 'cms_entries' : 'cms_pages';
+        $ownerTranslations = $ownerType === 'entry' ? $entryTranslations : $pageTranslations;
+        $ownerSelect = $ownerType === 'entry'
+            ? 'o.id, o.collection_id, o.author_id, o.workflow_status, o.published_at, o.scheduled_at, o.is_featured, o.view_count, o.sort_order, o.wizard_extra, o.sitemap_priority, o.sitemap_changefreq, o.is_in_sitemap, o.created_at, o.updated_at'
+            : 'o.id, o.parent_id, o.collection_id, o.page_type, o.status, o.published_at, o.scheduled_at, o.sort_order, o.sitemap_priority, o.sitemap_changefreq, o.is_in_sitemap, o.created_at, o.updated_at';
+
+        $sql = <<<SQL
+            SELECT {$ownerSelect},
+                   COALESCE(owner_translations.translations_json, {$emptyArray}) AS owner_translations_json,
+                   COALESCE(block_projection.blocks_json, {$emptyArray}) AS blocks_json,
+                   COALESCE(block_type_projection.block_types_json, {$emptyArray}) AS block_types_json,
+                   COALESCE(language_projection.languages_json, {$emptyArray}) AS languages_json,
+                   COALESCE(collection_projection.collections_json, {$emptyArray}) AS collections_json,
+                   COALESCE(page_projection.pages_json, {$emptyArray}) AS pages_json,
+                   COALESCE(entry_projection.entries_json, {$emptyArray}) AS entries_json,
+                   COALESCE(form_projection.forms_json, {$emptyArray}) AS forms_json,
+                   COALESCE(category_projection.categories_json, {$emptyArray}) AS categories_json
+            FROM {$ownerTable} o
+            LEFT JOIN ({$ownerTranslations}) owner_translations
+                ON owner_translations.resource_id = o.id
+            LEFT JOIN ({$blocks}) block_projection
+                ON block_projection.owner_type = '{$ownerType}'
+               AND block_projection.owner_id = o.id
+            LEFT JOIN ({$blockTypes}) block_type_projection ON 1 = 1
+            LEFT JOIN ({$languages}) language_projection ON 1 = 1
+            LEFT JOIN ({$collections}) collection_projection ON 1 = 1
+            LEFT JOIN ({$pages}) page_projection ON 1 = 1
+            LEFT JOIN ({$entries}) entry_projection ON 1 = 1
+            LEFT JOIN ({$forms}) form_projection ON 1 = 1
+            LEFT JOIN ({$categories}) category_projection ON 1 = 1
+            WHERE o.id = ?
+              AND o.deleted_at IS NULL
+            LIMIT 1
+        SQL;
+
+        $rows = ReadOnlyQuery::sql(
+            $this->db,
+            $sql,
+            [$ownerId, $ownerId, $ownerId, $ownerId],
+            'CMS admin ' . $ownerType . ' workspace projection',
+        );
+        $row = $rows[0] ?? null;
         if ($row === null) {
             return null;
         }
 
-        $translations = ReadOnlyQuery::rows(
-            $this->db->table('cms_page_translations')
-                ->select('id, page_id, language_id, slug, title, excerpt, meta_title, meta_description, og_image_file_id, og_image_url, og_type, canonical_url, robots, schema_data, created_at, updated_at')
-                ->where('page_id', $pageId)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin page translations',
-        );
-        foreach ($translations as &$translation) {
-            $translation['schema_data'] = $this->decodeJson($translation['schema_data'] ?? null);
-        }
-        unset($translation);
-
-        $row['id'] = (int) $row['id'];
-        $row['parent_id'] = $row['parent_id'] === null ? null : (int) $row['parent_id'];
-        $row['collection_id'] = $row['collection_id'] === null ? null : (int) $row['collection_id'];
-        $row['is_in_sitemap'] = (bool) $row['is_in_sitemap'];
-        $row['translations'] = $translations;
-
-        $default = $translations[0] ?? [];
-        $row['title'] = (string) ($default['title'] ?? '');
-        $row['slug'] = (string) ($default['slug'] ?? '');
-
-        return $row;
+        return $this->hydrateWorkspaceProjection($row, $ownerType);
     }
 
-    /** @return array<string, mixed>|null */
-    private function entry(int $entryId): ?array
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function hydrateWorkspaceProjection(array $row, string $ownerType): array
     {
-        $row = ReadOnlyQuery::rows(
-            $this->db->table('cms_entries')
-                ->select('id, collection_id, author_id, workflow_status, published_at, scheduled_at, is_featured, view_count, sort_order, wizard_extra, sitemap_priority, sitemap_changefreq, is_in_sitemap, created_at, updated_at')
-                ->where('id', $entryId)
-                ->where('deleted_at', null)
-                ->limit(1),
-            'CMS admin entry workspace',
-        )[0] ?? null;
-
-        if ($row === null) {
-            return null;
-        }
-
-        $translations = ReadOnlyQuery::rows(
-            $this->db->table('cms_entry_translations')
-                ->select('id, entry_id, language_id, slug, title, excerpt, featured_file_id, featured_image_url, meta_title, meta_description, og_image_file_id, og_type, canonical_url, robots, schema_data, created_at, updated_at')
-                ->where('entry_id', $entryId)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin entry translations',
-        );
+        $translations = $this->decodeJsonList($row['owner_translations_json'] ?? null);
         foreach ($translations as &$translation) {
             $translation['schema_data'] = $this->decodeJson($translation['schema_data'] ?? null);
         }
         unset($translation);
 
-        foreach (['id', 'collection_id', 'author_id', 'view_count', 'sort_order'] as $field) {
-            if ($row[$field] !== null) {
-                $row[$field] = (int) $row[$field];
+        $owner = $row;
+        unset(
+            $owner['owner_translations_json'],
+            $owner['blocks_json'],
+            $owner['block_types_json'],
+            $owner['languages_json'],
+            $owner['collections_json'],
+            $owner['pages_json'],
+            $owner['entries_json'],
+            $owner['forms_json'],
+            $owner['categories_json'],
+        );
+        $owner['id'] = (int) $owner['id'];
+        $owner['collection_id'] = $owner['collection_id'] === null ? null : (int) $owner['collection_id'];
+        if ($ownerType === 'page') {
+            $owner['parent_id'] = $owner['parent_id'] === null ? null : (int) $owner['parent_id'];
+            $owner['is_in_sitemap'] = (bool) $owner['is_in_sitemap'];
+        } else {
+            foreach (['author_id', 'view_count', 'sort_order'] as $field) {
+                if ($owner[$field] !== null) {
+                    $owner[$field] = (int) $owner[$field];
+                }
             }
+            $owner['is_featured'] = (bool) $owner['is_featured'];
+            $owner['is_in_sitemap'] = (bool) $owner['is_in_sitemap'];
+            $owner['wizard_extra'] = $this->decodeJson($owner['wizard_extra'] ?? null);
         }
-        $row['is_featured'] = (bool) $row['is_featured'];
-        $row['is_in_sitemap'] = (bool) $row['is_in_sitemap'];
-        $row['wizard_extra'] = $this->decodeJson($row['wizard_extra'] ?? null);
-        $row['translations'] = $translations;
+        $owner['translations'] = $translations;
         $default = $translations[0] ?? [];
-        $row['title'] = (string) ($default['title'] ?? '');
-        $row['slug'] = (string) ($default['slug'] ?? '');
-        $row['excerpt'] = (string) ($default['excerpt'] ?? '');
-
-        return $row;
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function languages(): array
-    {
-        $cached = $this->cache->get('admin_cms_workspace_languages');
-        if (is_array($cached)) {
-            RequestTelemetry::recordCache('admin.cms.workspace.languages', 'hit');
-
-            return $cached;
-        }
-        RequestTelemetry::recordCache('admin.cms.workspace.languages', 'miss');
-
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('cms_languages')
-                ->select('id, code, name, native_name, is_default, is_active, fallback_language_id, sort_order')
-                ->where('is_active', 1)
-                ->orderBy('sort_order', 'ASC')
-                ->orderBy('id', 'ASC'),
-            'CMS admin languages',
-        );
-        foreach ($rows as &$row) {
-            $row['id'] = (int) $row['id'];
-            $row['is_default'] = (bool) $row['is_default'];
-            $row['is_active'] = (bool) $row['is_active'];
-        }
-        unset($row);
-        $this->cache->save('admin_cms_workspace_languages', $rows, self::CACHE_TTL);
-
-        return $rows;
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function blocks(string $ownerType, int $ownerId): array
-    {
-        $instances = ReadOnlyQuery::rows(
-            $this->db->table('cms_block_instances i')
-                ->select('i.id, i.block_id, i.owner_type, i.owner_id, i.parent_instance_id, i.sort_order, i.column_index, i.is_active, i.block_config, i.created_at, i.updated_at')
-                ->where('i.owner_type', $ownerType)
-                ->where('i.owner_id', $ownerId)
-                ->orderBy('i.sort_order', 'ASC')
-                ->orderBy('i.id', 'ASC'),
-            'CMS admin ' . $ownerType . ' blocks',
-        );
-
-        if ($instances === []) {
-            return [];
+        $owner['title'] = (string) ($default['title'] ?? '');
+        $owner['slug'] = (string) ($default['slug'] ?? '');
+        if ($ownerType === 'entry') {
+            $owner['excerpt'] = (string) ($default['excerpt'] ?? '');
         }
 
-        $ids = array_values(array_map(static fn (array $row): int => (int) $row['id'], $instances));
-        $translations = ReadOnlyQuery::rows(
-            $this->db->table('cms_block_instance_translations')
-                ->select('id, instance_id, language_id, block_data, is_published, created_at, updated_at')
-                ->whereIn('instance_id', $ids)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin block translations',
-        );
-        $translationsByInstance = [];
-        foreach ($translations as $translation) {
-            $translation['language_id'] = (int) $translation['language_id'];
-            $translation['is_published'] = (bool) $translation['is_published'];
-            $translation['block_data'] = $this->decodeJson($translation['block_data'] ?? null);
-            $translationsByInstance[(int) $translation['instance_id']][] = $translation;
-        }
-
+        $blocks = $this->decodeJsonList($row['blocks_json'] ?? null);
         $fileIds = [];
-        foreach ($instances as &$instance) {
-            $instance['id'] = (int) $instance['id'];
-            $instance['block_id'] = (int) $instance['block_id'];
-            $instance['owner_id'] = (int) $instance['owner_id'];
-            $instance['parent_instance_id'] = $instance['parent_instance_id'] === null ? null : (int) $instance['parent_instance_id'];
-            $instance['sort_order'] = (int) $instance['sort_order'];
-            $instance['column_index'] = $instance['column_index'] === null ? null : (int) $instance['column_index'];
-            $instance['is_active'] = (bool) $instance['is_active'];
-            $instance['block_config'] = $this->decodeJson($instance['block_config'] ?? null);
-            $instance['translations'] = $translationsByInstance[$instance['id']] ?? [];
-            $fileIds = array_merge($fileIds, $this->fileIds($instance['block_config']));
-            foreach ($instance['translations'] as $translation) {
-                $fileIds = array_merge($fileIds, $this->fileIds($translation['block_data'] ?? []));
+        foreach ($blocks as &$block) {
+            $block['id'] = (int) ($block['id'] ?? 0);
+            $block['block_id'] = (int) ($block['block_id'] ?? 0);
+            $block['owner_id'] = (int) ($block['owner_id'] ?? 0);
+            $block['parent_instance_id'] = $block['parent_instance_id'] === null ? null : (int) $block['parent_instance_id'];
+            $block['sort_order'] = (int) ($block['sort_order'] ?? 0);
+            $block['column_index'] = $block['column_index'] === null ? null : (int) $block['column_index'];
+            $block['is_active'] = (bool) ($block['is_active'] ?? false);
+            $block['block_config'] = $this->decodeJson($block['block_config'] ?? null);
+            $block['translations'] = $this->decodeJsonList($block['translations'] ?? null);
+            foreach ($block['translations'] as &$translation) {
+                $translation['language_id'] = (int) ($translation['language_id'] ?? 0);
+                $translation['is_published'] = (bool) ($translation['is_published'] ?? false);
+                $translation['block_data'] = $this->decodeJson($translation['block_data'] ?? null);
+                $fileIds = array_merge($fileIds, $this->fileIds($translation['block_data']));
             }
+            unset($translation);
+            $fileIds = array_merge($fileIds, $this->fileIds($block['block_config']));
         }
-        unset($instance);
+        unset($block);
 
         $media = $this->fileUrlResolver->resolveManyMeta(array_values(array_unique($fileIds)), 'admin');
-        foreach ($instances as &$instance) {
-            $instance['block_config'] = $this->hydrateMedia($instance['block_config'], $media);
-            foreach ($instance['translations'] as &$translation) {
+        foreach ($blocks as &$block) {
+            $block['block_config'] = $this->hydrateMedia($block['block_config'], $media);
+            foreach ($block['translations'] as &$translation) {
                 $translation['block_data'] = $this->hydrateMedia($translation['block_data'], $media);
             }
             unset($translation);
         }
-        unset($instance);
+        unset($block);
 
-        return $instances;
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function blockTypes(): array
-    {
-        $cached = $this->cache->get('admin_cms_workspace_block_types');
-        if (is_array($cached)) {
-            RequestTelemetry::recordCache('admin.cms.workspace.block-types', 'hit');
-
-            return $cached;
+        $blockTypes = [];
+        foreach ($this->decodeJsonList($row['block_types_json'] ?? null) as $blockType) {
+            $blockType['id'] = (int) ($blockType['id'] ?? 0);
+            $schema = $this->decodeJson($blockType['schema_definition'] ?? null);
+            $blockType['schema_definition'] = $schema;
+            $blockType['fields'] = is_array($schema['fields'] ?? null) ? $schema['fields'] : [];
+            $blockType['config_fields'] = is_array($schema['config_fields'] ?? null) ? $schema['config_fields'] : [];
+            $blockType['supports_pages'] = (bool) ($blockType['supports_pages'] ?? false);
+            $blockType['supports_entries'] = (bool) ($blockType['supports_entries'] ?? false);
+            $blockType['is_container'] = (bool) ($blockType['is_container'] ?? false);
+            $blockType['is_active'] = (bool) ($blockType['is_active'] ?? false);
+            $blockTypes[$blockType['id']] = $blockType;
         }
-        RequestTelemetry::recordCache('admin.cms.workspace.block-types', 'miss');
 
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('cms_content_blocks')
-                ->select('id, block_key, name, description, category, icon, schema_definition, supports_pages, supports_entries, is_container, is_active, sort_order')
-                ->where('is_active', 1)
-                ->orderBy('sort_order', 'ASC')
-                ->orderBy('name', 'ASC')
-                ->orderBy('id', 'ASC'),
-            'CMS admin block types',
-        );
-        $indexed = [];
-        foreach ($rows as $row) {
-            $schema = $this->decodeJson($row['schema_definition'] ?? null);
-            $row['id'] = (int) $row['id'];
-            $row['schema_definition'] = $schema;
-            $row['fields'] = is_array($schema['fields'] ?? null) ? $schema['fields'] : [];
-            $row['config_fields'] = is_array($schema['config_fields'] ?? null) ? $schema['config_fields'] : [];
-            $row['supports_pages'] = (bool) $row['supports_pages'];
-            $row['supports_entries'] = (bool) $row['supports_entries'];
-            $row['is_container'] = (bool) $row['is_container'];
-            $row['is_active'] = (bool) $row['is_active'];
-            $indexed[$row['id']] = $row;
-        }
-        $this->cache->save('admin_cms_workspace_block_types', $indexed, self::CACHE_TTL);
-
-        return $indexed;
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function pageOptions(): array
-    {
-        $cached = $this->cache->get('admin_cms_workspace_pages');
-        if (is_array($cached)) {
-            RequestTelemetry::recordCache('admin.cms.workspace.pages', 'hit');
-
-            return $cached;
-        }
-        RequestTelemetry::recordCache('admin.cms.workspace.pages', 'miss');
-
-        $pages = ReadOnlyQuery::rows(
-            $this->db->table('cms_pages')
-                ->select('id, parent_id, collection_id, page_type, status, sort_order, created_at, updated_at')
-                ->where('deleted_at', null)
-                ->orderBy('sort_order', 'ASC')
-                ->orderBy('id', 'ASC')
-                ->limit(250),
-            'CMS admin page options',
-        );
-        $ids = array_values(array_map(static fn (array $row): int => (int) $row['id'], $pages));
-        $translations = $ids === [] ? [] : ReadOnlyQuery::rows(
-            $this->db->table('cms_page_translations')
-                ->select('page_id, language_id, slug, title')
-                ->whereIn('page_id', $ids)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin page option translations',
-        );
-        $byPage = [];
-        foreach ($translations as $translation) {
-            $byPage[(int) $translation['page_id']][] = $translation;
-        }
-        foreach ($pages as &$page) {
-            $page['id'] = (int) $page['id'];
-            $page['translations'] = $byPage[$page['id']] ?? [];
-        }
-        unset($page);
-        $this->cache->save('admin_cms_workspace_pages', $pages, self::CACHE_TTL);
-
-        return $pages;
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function collections(): array
-    {
-        $cached = $this->cache->get('admin_cms_workspace_collections');
-        if (is_array($cached)) {
-            RequestTelemetry::recordCache('admin.cms.workspace.collections', 'hit');
-
-            return $cached;
-        }
-        RequestTelemetry::recordCache('admin.cms.workspace.collections', 'miss');
-
-        $collections = ReadOnlyQuery::rows(
-            $this->db->table('cms_collections')
-                ->select('id, collection_key, collection_type, is_active, sort_order')
-                ->where('is_active', 1)
-                ->orderBy('sort_order', 'ASC')
-                ->orderBy('id', 'ASC')
-                ->limit(250),
-            'CMS admin collection options',
-        );
-        $ids = array_values(array_map(static fn (array $row): int => (int) $row['id'], $collections));
-        $translations = $ids === [] ? [] : ReadOnlyQuery::rows(
-            $this->db->table('cms_collection_translations')
-                ->select('collection_id, language_id, name, slug')
-                ->whereIn('collection_id', $ids)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin collection option translations',
-        );
-        $byCollection = [];
-        foreach ($translations as $translation) {
-            $byCollection[(int) $translation['collection_id']][] = $translation;
-        }
+        $collections = $this->decodeJsonList($row['collections_json'] ?? null);
         foreach ($collections as &$collection) {
-            $collection['id'] = (int) $collection['id'];
-            $collection['translations'] = $byCollection[$collection['id']] ?? [];
-            $collection['name'] = (string) ($collection['translations'][0]['name'] ?? $collection['collection_key']);
+            $collection['id'] = (int) ($collection['id'] ?? 0);
+            $collection['is_active'] = (bool) ($collection['is_active'] ?? false);
+            $collection['translations'] = $this->decodeJsonList($collection['translations'] ?? null);
+            $collection['name'] = (string) ($collection['translations'][0]['name'] ?? $collection['collection_key'] ?? '');
         }
         unset($collection);
-        $this->cache->save('admin_cms_workspace_collections', $collections, self::CACHE_TTL);
 
-        return $collections;
+        $pages = $this->decodeJsonList($row['pages_json'] ?? null);
+        foreach ($pages as &$page) {
+            $page['id'] = (int) ($page['id'] ?? 0);
+            $page['translations'] = $this->decodeJsonList($page['translations'] ?? null);
+        }
+        unset($page);
+
+        $entries = $this->decodeJsonList($row['entries_json'] ?? null);
+        foreach ($entries as &$entry) {
+            $entry['id'] = (int) ($entry['id'] ?? 0);
+            $entry['collection_id'] = $entry['collection_id'] === null ? null : (int) $entry['collection_id'];
+            $entry['translations'] = $this->decodeJsonList($entry['translations'] ?? null);
+            $entry['title'] = (string) ($entry['translations'][0]['title'] ?? $entry['translations'][0]['slug'] ?? $entry['id']);
+        }
+        unset($entry);
+
+        $categories = [];
+        $collectionNames = $this->collectionNames($collections);
+        foreach ($this->decodeJsonList($row['categories_json'] ?? null) as $category) {
+            $category['id'] = (int) ($category['id'] ?? 0);
+            $category['collection_id'] = (int) ($category['collection_id'] ?? 0);
+            $category['translations'] = $this->decodeJsonList($category['translations'] ?? null);
+            $categories[] = [
+                'value' => (string) $category['id'],
+                'label' => (string) ($collectionNames[$category['collection_id']] ?? 'Colección')
+                    . ' · ' . (string) ($category['translations'][0]['name'] ?? $category['id']),
+            ];
+        }
+
+        $forms = [];
+        foreach ($this->decodeJsonList($row['forms_json'] ?? null) as $form) {
+            $key = trim((string) ($form['form_key'] ?? ''));
+            if ($key !== '') {
+                $forms[] = $key;
+            }
+        }
+
+        $languages = $this->decodeJsonList($row['languages_json'] ?? null);
+        foreach ($languages as &$language) {
+            $language['id'] = (int) ($language['id'] ?? 0);
+            $language['is_default'] = (bool) ($language['is_default'] ?? false);
+            $language['is_active'] = (bool) ($language['is_active'] ?? false);
+        }
+        unset($language);
+
+        return [
+            'owner' => $owner,
+            'blocks' => $blocks,
+            'blockTypes' => $blockTypes,
+            'languages' => $languages,
+            'collections' => $collections,
+            'pages' => $pages,
+            'entries' => $entries,
+            'forms' => array_values(array_unique($forms)),
+            'categories' => $categories,
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $collections @return array<int, string> */
+    private function collectionNames(array $collections): array
+    {
+        $names = [];
+        foreach ($collections as $collection) {
+            $names[(int) ($collection['id'] ?? 0)] = (string) ($collection['name'] ?? $collection['collection_key'] ?? 'Colección');
+        }
+
+        return $names;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function decodeJsonList(mixed $value): array
+    {
+        $decoded = $this->decodeJson($value);
+        if (is_string($decoded)) {
+            $decoded = $this->decodeJson($decoded);
+        }
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_filter($decoded, 'is_array'));
     }
 
     /** @param list<array<string, mixed>> $collections @return array<string, int> */
@@ -472,10 +766,21 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
      * @param array<int, array<string, mixed>> $blockTypes
      * @param list<array<string, mixed>> $collections
      * @param list<string> $permissions
+     * @param list<string> $preloadedForms
+     * @param list<array<string, mixed>> $preloadedPages
+     * @param list<array<string, mixed>> $preloadedEntries
+     * @param list<array{value: string, label: string}> $preloadedCategories
      * @return array<int, array<string, mixed>>
      */
-    private function withDynamicOptions(array $blockTypes, array $collections, array $permissions): array
-    {
+    private function withDynamicOptions(
+        array $blockTypes,
+        array $collections,
+        array $permissions,
+        array $preloadedForms,
+        array $preloadedPages,
+        array $preloadedEntries,
+        array $preloadedCategories,
+    ): array {
         $blockTypes = $this->withCollectionOptions($blockTypes, $collections);
         $collectionKeys = [];
         $collectionIds = [];
@@ -489,10 +794,10 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                 $collectionIds[] = ['value' => $id, 'label' => (string) ($collection['name'] ?? $key ?? $id)];
             }
         }
-        $pages = null;
-        $entries = null;
-        $forms = null;
-        $categories = null;
+        $pages = $preloadedPages;
+        $entries = $preloadedEntries;
+        $forms = $preloadedForms;
+        $categories = $preloadedCategories;
 
         foreach ($blockTypes as &$blockType) {
             $schema = is_array($blockType['schema_definition'] ?? null)
@@ -512,19 +817,15 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
             $this->setSelectOptions($configFields, 'collection_key', $collectionKeys);
             $this->setSelectOptions($configFields, 'collection_id', $collectionIds);
             if (isset($configFields['form_key'])) {
-                $forms ??= $this->formOptions();
                 $this->setSelectOptions($configFields, 'form_key', $forms !== [] ? $forms : ['contact']);
             }
             if (isset($configFields['page_id'])) {
-                $pages ??= $this->optionRows($this->pageOptions(), ['name', 'title', 'label', 'slug']);
-                $this->setSelectOptions($configFields, 'page_id', $pages);
+                $this->setSelectOptions($configFields, 'page_id', $this->optionRows($pages, ['name', 'title', 'label', 'slug']));
             }
             if (isset($configFields['entry_id'])) {
-                $entries ??= $this->entryOptions();
-                $this->setSelectOptions($configFields, 'entry_id', $entries);
+                $this->setSelectOptions($configFields, 'entry_id', $this->optionRows($entries, ['title', 'name', 'slug']));
             }
             if (isset($configFields['category_id']) && in_array('cms.categories.read', $permissions, true)) {
-                $categories ??= $this->categoryOptions($collections);
                 $this->setSelectOptions($configFields, 'category_id', $categories);
             }
 
@@ -547,7 +848,11 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
                         if ((string) ($collection['collection_key'] ?? '') !== $collectionKey) {
                             continue;
                         }
-                        foreach ($this->entryOptions((int) ($collection['id'] ?? 0)) as $option) {
+                        $collectionEntries = array_values(array_filter(
+                            $entries,
+                            static fn (array $entry): bool => (int) ($entry['collection_id'] ?? 0) === (int) ($collection['id'] ?? 0),
+                        ));
+                        foreach ($this->optionRows($collectionEntries, ['title', 'name', 'slug']) as $option) {
                             $field['options'][] = [
                                 'value' => $collectionKey . ':' . $option['value'],
                                 'label' => $option['label'] . ' · ' . $collectionKey,
@@ -573,87 +878,6 @@ final class AdminCmsWorkspaceSource implements AdminCmsWorkspaceSourceInterface
         }
         $fields[$key]['type'] = 'select';
         $fields[$key]['options'] = $options;
-    }
-
-    /** @return list<string> */
-    private function formOptions(): array
-    {
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('cms_forms')
-                ->select('form_key')
-                ->where('is_active', 1)
-                ->orderBy('form_key', 'ASC')
-                ->limit(100),
-            'CMS admin form options',
-        );
-
-        return array_values(array_filter(array_map(
-            static fn (array $row): string => trim((string) ($row['form_key'] ?? '')),
-            $rows,
-        ), static fn (string $key): bool => $key !== ''));
-    }
-
-    /** @param list<array<string, mixed>> $collections @return list<array{value: string, label: string}> */
-    private function categoryOptions(array $collections): array
-    {
-        $names = [];
-        foreach ($collections as $collection) {
-            $names[(int) ($collection['id'] ?? 0)] = (string) ($collection['name'] ?? $collection['collection_key'] ?? 'Colección');
-        }
-        $rows = ReadOnlyQuery::rows(
-            $this->db->table('cms_categories c')
-                ->select('c.id, c.collection_id, t.name')
-                ->join('cms_category_translations t', 't.category_id = c.id', 'left')
-                ->where('c.is_active', 1)
-                ->orderBy('c.sort_order', 'ASC')
-                ->orderBy('c.id', 'ASC')
-                ->limit(500),
-            'CMS admin category options',
-        );
-
-        return array_values(array_map(static function (array $row) use ($names): array {
-            $id = (int) ($row['id'] ?? 0);
-            $collection = $names[(int) ($row['collection_id'] ?? 0)] ?? 'Colección';
-            return ['value' => (string) $id, 'label' => $collection . ' · ' . (string) ($row['name'] ?? $id)];
-        }, $rows));
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function entryOptions(?int $collectionId = null): array
-    {
-        $query = $this->db->table('cms_entries e')
-            ->select('e.id, e.collection_id, e.workflow_status, e.published_at, e.sort_order, e.created_at, e.updated_at')
-            ->where('e.deleted_at', null)
-            ->orderBy('e.sort_order', 'ASC')
-            ->orderBy('e.id', 'ASC')
-            ->limit(250);
-        if ($collectionId !== null && $collectionId > 0) {
-            $query->where('e.collection_id', $collectionId);
-        }
-        $entries = ReadOnlyQuery::rows($query, 'CMS admin entry options');
-        if ($entries === []) {
-            return [];
-        }
-        $ids = array_values(array_map(static fn (array $row): int => (int) $row['id'], $entries));
-        $translations = ReadOnlyQuery::rows(
-            $this->db->table('cms_entry_translations')
-                ->select('entry_id, language_id, slug, title')
-                ->whereIn('entry_id', $ids)
-                ->orderBy('language_id', 'ASC'),
-            'CMS admin entry option translations',
-        );
-        $byEntry = [];
-        foreach ($translations as $translation) {
-            $byEntry[(int) $translation['entry_id']][] = $translation;
-        }
-        foreach ($entries as &$entry) {
-            $entry['id'] = (int) $entry['id'];
-            $entry['translations'] = $byEntry[$entry['id']] ?? [];
-            $entry['title'] = (string) ($entry['translations'][0]['title'] ?? $entry['translations'][0]['slug'] ?? $entry['id']);
-        }
-        unset($entry);
-
-        return $entries;
     }
 
     /** @param list<array<string, mixed>> $rows @param list<string> $fallbackKeys @return list<array{value: string, label: string}> */

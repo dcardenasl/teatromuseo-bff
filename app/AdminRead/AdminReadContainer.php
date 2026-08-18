@@ -103,7 +103,6 @@ final class AdminReadContainer
                 ),
                 $hubPublicBaseUrl,
             ),
-            \Config\Services::cache(),
         );
     }
 
