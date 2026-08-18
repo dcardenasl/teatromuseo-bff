@@ -16,6 +16,7 @@ use App\PublicRead\Cms\PublicReadFormReader;
 use App\PublicRead\Cms\PublicReadNavigationReader;
 use App\PublicRead\Cms\PublicReadPageReader;
 use App\PublicRead\Cms\PublicReadSettingsReader;
+use App\PublicRead\Cms\PublicReadSitemapReader;
 use App\PublicRead\Cms\PublicReadTagReader;
 use App\PublicRead\Cms\PublicRedirectResolver;
 use App\PublicRead\Cms\SlugRouter;
@@ -67,6 +68,7 @@ final class PublicReadContainer
         );
         $translationResolver = new TranslationResolver($fileResolver, $db);
         $redirects = new PublicRedirectResolver($db, $translationResolver, new SlugRouter($db));
+        $sitemap = new PublicReadSitemapReader($db, self::fallbackLocale());
 
         return new CmsPublicReadBundle(
             db: $db,
@@ -81,6 +83,7 @@ final class PublicReadContainer
             pageBootstrap: new PageBootstrapCompositionReader($redirects, $pages),
             layout: new LayoutCompositionReader($navigation, $settings, $collections),
             redirects: $redirects,
+            sitemap: $sitemap,
         );
     }
 

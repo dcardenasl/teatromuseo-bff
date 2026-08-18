@@ -13,6 +13,7 @@ use App\PublicRead\Cms\PublicReadFormReader;
 use App\PublicRead\Cms\PublicReadNavigationReader;
 use App\PublicRead\Cms\PublicReadPageReader;
 use App\PublicRead\Cms\PublicReadSettingsReader;
+use App\PublicRead\Cms\PublicReadSitemapReader;
 use App\PublicRead\Cms\PublicReadTagReader;
 use App\PublicRead\Cms\PublicRedirectResolver;
 use CodeIgniter\Database\BaseConnection;
@@ -34,6 +35,7 @@ final readonly class CmsPublicReadBundle
         public PageBootstrapCompositionReader $pageBootstrap,
         public LayoutCompositionReader $layout,
         public PublicRedirectResolver $redirects,
+        public PublicReadSitemapReader $sitemap,
     ) {
     }
 }

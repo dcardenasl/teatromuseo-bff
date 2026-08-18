@@ -8,6 +8,7 @@ $publicReadFilters = ['webappkey', 'throttle', 'correlationid', 'publicTelemetry
 
 $routes->group('public-read', ['namespace' => '\\App\\Controllers\\Api\\V1\\PublicRead', 'filter' => $publicReadFilters], static function ($routes): void {
     $routes->get('(:segment)/navigation', 'CmsPublicReadController::navigation/$1');
+    $routes->get('(:segment)/sitemap', 'CmsPublicReadController::sitemap/$1');
     $routes->get('(:segment)/settings', 'CmsPublicReadController::settings/$1');
     $routes->get('(:segment)/pages', 'CmsPublicReadController::pages/$1');
     $routes->get('(:segment)/pages/(.+)', 'CmsPublicReadController::page/$1/$2');

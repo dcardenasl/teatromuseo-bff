@@ -99,6 +99,15 @@ final class CmsPublicReadController extends PublicReadSupport
         }
     }
 
+    public function sitemap(string $locale): ResponseInterface
+    {
+        try {
+            return $this->result(Services::publicReadCms()->sitemap->show($locale));
+        } catch (Throwable $exception) {
+            return $this->failure($locale, $exception);
+        }
+    }
+
     public function categories(string $locale, string $collectionKey): ResponseInterface
     {
         try {
