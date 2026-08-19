@@ -33,6 +33,12 @@
   La matriz PHP 8.2–8.5 se mantiene y el CI verifica explícitamente
   `composer check-platform-reqs --no-dev`.
 
+- [x] **BFF-ADMINREAD-16 — Snapshot de usos sin lectura duplicada.** Cerrada
+  2026-08-19. El lector de archivos consume el snapshot autorizado del Hub,
+  conserva `context` y estados por fuente, y deja de consultar CMS por segunda
+  vez; la deduplicación estable se mantiene en el seam BFF. Verificado con
+  `composer quality` (291 tests, 1.005 assertions, 1 skip).
+
 ## ✅ Completadas
 
 - [x] **BFF-TOTEM-02 — `last_occurrence_at` en el listado público de eventos.**
