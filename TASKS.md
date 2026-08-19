@@ -35,6 +35,13 @@
 
 ## ✅ Completadas
 
+- [x] **CMS-EDITOR-03 — Contrato BFF de lectura editorial.** Cerrada
+  2026-08-18. `CmsWorkspaceProjectionQuery` filtra block types por owner y
+  proyecta idiomas, colecciones, páginas, entries y forms sólo con el permiso
+  de lectura correspondiente; se agregó una regresión de no exposición de
+  catálogos. Verificado con `composer quality` (282 tests, 986 asserts,
+  1 skip).
+
 - [x] **BFF-ADMINREAD-05 — Lector de analytics + adaptación de traducciones.**
   Cerrada 2026-08-17. Se añadió `CmsAnalyticsDashboardSource` con consultas
   `SELECT` explícitas y ventana fija de 7 días, más un adapter BFF→CMS para
