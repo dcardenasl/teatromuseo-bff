@@ -35,6 +35,16 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-TOTEM-02 — `last_occurrence_at` en el listado público de eventos.**
+  Cerrada 2026-08-19. `EventPublicReadController::LIST_FIELDS` y
+  `PublicReadEventReader::index()`/`hydrate()` exponen `last_occurrence_at`
+  (ya usado internamente para ordenar `sort=agenda`, nunca antes proyectado)
+  junto a `next_occurrence_at`. Necesario para que un consumidor como el
+  Tótem pueda mostrar la fecha real de un evento ya pasado cuando lo usa
+  como relleno tras agotar los próximos — antes esa fecha no existía en el
+  contrato de listado. Sin cambios de comportamiento para consumidores que
+  no piden el campo. Verificado con `composer quality` (291 tests).
+
 - [x] **BFF-TOTEM-01 — Identidad de llamador confiable + curación de kiosco
   en public-read.** Cerrada 2026-08-18. Parte del plan cross-repo para migrar
   `teatromuseo-totem-ci4` del proxy Hub que nunca se implementó
