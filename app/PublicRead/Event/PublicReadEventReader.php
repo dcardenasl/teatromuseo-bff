@@ -65,6 +65,9 @@ final class PublicReadEventReader implements EventReaderInterface
         if ($this->wants($fields, 'next_occurrence_at')) {
             $select[] = 'occurrence_projection.next_occurrence_at AS next_occurrence_at';
         }
+        if ($this->wants($fields, 'last_occurrence_at')) {
+            $select[] = 'occurrence_projection.last_occurrence_at AS last_occurrence_at';
+        }
 
         $builder->select(implode(', ', $select), false);
         PublicReadPagination::apply($builder, $request->page, $request->perPage);
@@ -340,6 +343,9 @@ SQL;
             }
             if ($this->wants($fields, 'next_occurrence_at')) {
                 $payload['next_occurrence_at'] = $row['next_occurrence_at'] ?? null;
+            }
+            if ($this->wants($fields, 'last_occurrence_at')) {
+                $payload['last_occurrence_at'] = $row['last_occurrence_at'] ?? null;
             }
             if ($this->wants($fields, 'status')) {
                 $payload['status'] = (string) ($row['status'] ?? '');

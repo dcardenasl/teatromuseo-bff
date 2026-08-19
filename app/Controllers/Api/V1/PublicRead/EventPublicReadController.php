@@ -15,7 +15,7 @@ final class EventPublicReadController extends PublicReadSupport
     /** @var list<string> */
     private const LIST_FIELDS = [
         'id', 'uuid', 'title', 'event_type', 'slug', 'cover_file_id', 'cover_image', 'localized',
-        'next_occurrence_at', 'status',
+        'next_occurrence_at', 'last_occurrence_at', 'status',
     ];
 
     /** @var list<string> */
