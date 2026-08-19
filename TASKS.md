@@ -35,6 +35,22 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-TOTEM-01 — Identidad de llamador confiable + curación de kiosco
+  en public-read.** Cerrada 2026-08-18. Parte del plan cross-repo para migrar
+  `teatromuseo-totem-ci4` del proxy Hub que nunca se implementó
+  (`/api/v1/totem/*`) al seam `public-read` que ya usa `teatromuseo-web` (ver
+  ADR-010). `WebAppKeyRequiredFilter` ahora acepta múltiples llaves
+  confiables (`BFF_API_KEY`/`WEB_API_KEY` → `web`, `TOTEM_BFF_API_KEY` →
+  `totem`) sin agregar rutas nuevas, registrando el llamador resuelto en
+  `App\Support\PublicReadCallerContext` (nunca confía en un parámetro del
+  cliente). `PublicReadCollectionItemReader` aplica
+  `collection_items.show_in_totem` solo cuando el llamador es `totem` — Web
+  sigue viendo todo lo publicado. `CatalogFacetReader::categories()`/
+  `techniques()` ganan `with_counts`, con el mismo predicado de curación,
+  para reemplazar el antipatrón de traer toda la colección solo para
+  chequear un booleano. Verificado con `composer quality` (292 tests,
+  1009 asserts, 1 skip).
+
 - [x] **CMS-EDITOR-03 — Contrato BFF de lectura editorial.** Cerrada
   2026-08-18. `CmsWorkspaceProjectionQuery` filtra block types por owner y
   proyecta idiomas, colecciones, páginas, entries y forms sólo con el permiso
@@ -387,6 +403,22 @@
   skip informativos).
 
 ## 🟡 Próximo
+
+### Tótem consume Cartelera / TeatroEscuela / Catálogo vía BFF (2026-08-18)
+
+Fuente de verdad:
+[`../docs/plan/2026-08-18-plan-totem-via-bff.md`](../docs/plan/2026-08-18-plan-totem-via-bff.md).
+El Tótem está llamando `/api/v1/totem/*` en el Hub, pero esas rutas nunca se
+implementaron y el cliente convierte 404, timeout y JSON inválido en `[]`.
+Este track reutiliza los lectores `PublicRead` existentes del BFF, no crea un
+proxy nuevo en el Hub ni modifica el contrato de Web sin regresiones explícitas.
+
+El baseline `BFF-TOTEM-01` (identidad multi-llamador, clave dedicada,
+curación `show_in_totem`, `with_counts` y quality) ya está marcado como
+cerrado arriba con los cambios locales existentes. La verificación
+cross-repo de rutas, envelope, límites, ausencia de escrituras, paridad con
+Web y smoke con el Tótem queda integrada en `TOTEM-BFF-06`; no se crea una
+segunda tarea BFF para duplicar ese gate.
 
 ### Lecturas compuestas del Admin vía BFF (2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-lecturas-compuestas-via-bff.md`
 
