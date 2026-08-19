@@ -11,11 +11,22 @@ use CodeIgniter\Router\RouteCollection;
 if (ENVIRONMENT !== 'production') {
     $routes->get('/api/docs', static function () {
         $swaggerJsonUrl = base_url('swagger.json');
+        $faviconUrl = base_url('favicon.ico');
+        $faviconSvgUrl = base_url('favicon.svg');
+        $faviconPngUrl = base_url('favicon-96x96.png');
+        $appleTouchIconUrl = base_url('apple-touch-icon.png');
+        $manifestUrl = base_url('site.webmanifest');
         return <<<HTML
             <!DOCTYPE html>
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
+                <link rel="icon" type="image/svg+xml" href="{$faviconSvgUrl}">
+                <link rel="icon" type="image/x-icon" href="{$faviconUrl}">
+                <link rel="icon" type="image/png" sizes="96x96" href="{$faviconPngUrl}">
+                <link rel="apple-touch-icon" href="{$appleTouchIconUrl}">
+                <link rel="manifest" href="{$manifestUrl}">
+                <meta name="theme-color" content="#ffffff">
                 <title>API Docs</title>
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
             </head>
