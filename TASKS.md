@@ -437,6 +437,21 @@ cross-repo de rutas, envelope, límites, ausencia de escrituras, paridad con
 Web y smoke con el Tótem queda integrada en `TOTEM-BFF-06`; no se crea una
 segunda tarea BFF para duplicar ese gate.
 
+### Soporte de request condicional (`ETag`/`If-None-Match`) en `public-read` (2026-08-19, pointer)
+
+Fuente de verdad:
+[`../docs/plan/2026-08-19-plan-totem-endurecimiento-post-bff.md`](../docs/plan/2026-08-19-plan-totem-endurecimiento-post-bff.md)
+(Fase 4, `TOTEM-BFF-12` en `teatromuseo-totem-ci4/TASKS.md`). Cada envelope de
+`public-read` ya calcula `meta.source_revision` (hash de contenido, ver
+`PublicReadCollectionItemReader::revision()`), pero no está conectado a
+ningún short-circuit `304 Not Modified` — cada llamada, incluso un resync
+sin cambios reales tras un apagón, paga el costo completo de query +
+serialización. Afecta tanto a Web como al Tótem (ambos consumidores de
+`public-read`), por lo que no se ejecuta como cambio solo-tótem — queda
+pendiente de triage propio en este repo. No se abre como tarea numerada
+todavía porque no hay decisión de diseño tomada (¿`ETag` HTTP estándar vs.
+un parámetro `?since_revision=` explícito en el envelope?).
+
 ### Lecturas compuestas del Admin vía BFF (2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-lecturas-compuestas-via-bff.md`
 
 El seam `AdminRead` ya cubre dashboard, analytics, traducciones, usos de
