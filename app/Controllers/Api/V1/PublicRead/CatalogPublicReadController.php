@@ -55,7 +55,7 @@ final class CatalogPublicReadController extends PublicReadSupport
     public function categories(): ResponseInterface
     {
         try {
-            return $this->data(Services::publicReadCatalogFacets()->categories());
+            return $this->data(Services::publicReadCatalogFacets()->categories($this->withCounts()));
         } catch (Throwable $exception) {
             return $this->failure('en', $exception);
         }
@@ -64,7 +64,7 @@ final class CatalogPublicReadController extends PublicReadSupport
     public function techniques(): ResponseInterface
     {
         try {
-            return $this->data(Services::publicReadCatalogFacets()->techniques());
+            return $this->data(Services::publicReadCatalogFacets()->techniques($this->withCounts()));
         } catch (Throwable $exception) {
             return $this->failure('en', $exception);
         }
@@ -79,5 +79,12 @@ final class CatalogPublicReadController extends PublicReadSupport
         } catch (Throwable $exception) {
             return $this->failure('en', $exception);
         }
+    }
+
+    private function withCounts(): bool
+    {
+        $raw = $this->request->getGet('with_counts');
+
+        return is_string($raw) && in_array(strtolower(trim($raw)), ['1', 'true'], true);
     }
 }

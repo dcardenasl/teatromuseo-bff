@@ -8,6 +8,7 @@ use App\PublicRead\Page\CatalogItemReaderInterface;
 use App\PublicRead\Support\MediaHydrator;
 use App\PublicRead\Support\PublicReadEnvelope;
 use App\PublicRead\Support\PublicReadPagination;
+use App\Support\PublicReadCallerContext;
 use CodeIgniter\Database\BaseBuilder;
 use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
@@ -219,6 +220,15 @@ final class PublicReadCollectionItemReader implements CatalogItemReaderInterface
             $this->columnsFor($fields),
         )));
         $builder->where('ci.is_active', 1)->where('ci.status', 'published')->where('ci.deleted_at', null);
+
+        // Kiosk-only curation: the museum flags which pieces are appropriate
+        // for unattended public display via `show_in_totem`. This is
+        // resolved from the trusted caller identity the auth filter set
+        // (never a client-supplied parameter), so Web keeps seeing every
+        // published item and only the totem sees the curated subset.
+        if (PublicReadCallerContext::isTotem()) {
+            $builder->where('ci.show_in_totem', 1);
+        }
 
         return $builder;
     }

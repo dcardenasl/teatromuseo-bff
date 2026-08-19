@@ -128,6 +128,7 @@ final class PublicReadSlugFixture
                 links TEXT,
                 company_history TEXT,
                 is_active INTEGER,
+                show_in_totem INTEGER DEFAULT 1,
                 created_at TEXT,
                 updated_at TEXT,
                 deleted_at TEXT
@@ -155,13 +156,14 @@ final class PublicReadSlugFixture
     }
 
     /** @param BaseConnection<mixed, mixed> $db */
-    public static function insertCatalog(BaseConnection $db): void
+    public static function insertCatalog(BaseConnection $db, int $showInTotem = 1): void
     {
         $db->table('collection_items')->insert([
             'id' => 1,
             'name' => 'Pieza',
             'status' => 'published',
             'is_active' => 1,
+            'show_in_totem' => $showInTotem,
             'created_at' => '2026-01-01 00:00:00',
             'updated_at' => '2026-01-01 00:00:00',
         ]);
