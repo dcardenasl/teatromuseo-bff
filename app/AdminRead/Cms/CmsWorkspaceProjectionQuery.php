@@ -11,12 +11,11 @@ use CodeIgniter\Database\BaseConnection;
 /**
  * Builds and executes the single bounded SQL projection behind
  * {@see AdminCmsWorkspaceSource}: one page/entry row joined against its
- * translations, blocks (with their own translations), active block types,
- * languages, collections, pages, entries, forms and (permission-gated)
- * category/entry-taxonomy relations. Every relation is reduced by the
- * database engine first; this class returns the raw joined row (still
- * JSON-encoded per relation) — {@see CmsWorkspaceRowHydrator} decodes and
- * types it.
+ * translations, blocks (with their own translations), relevant active block
+ * types, and only the auxiliary catalogs covered by the caller's permission
+ * scope. Every relation is reduced by the database engine first; this class
+ * returns the raw joined row (still JSON-encoded per relation) —
+ * {@see CmsWorkspaceRowHydrator} decodes and types it.
  *
  * Extracted from `AdminCmsWorkspaceSource::workspaceProjection()` as a pure
  * move: no SQL or binding order changed.
@@ -31,6 +30,10 @@ final class CmsWorkspaceProjectionQuery
      */
     public static function fetch(BaseConnection $db, string $ownerType, int $ownerId, array $permissions): ?array
     {
+        if (! in_array($ownerType, ['page', 'entry'], true)) {
+            throw new \InvalidArgumentException('CMS workspace owner type is invalid.');
+        }
+
         $jsonSql = JsonArrayAggregateSql::forDatabase($db);
         $aggregate = $jsonSql['aggregate'];
         $object = $jsonSql['object'];
@@ -153,6 +156,7 @@ final class CmsWorkspaceProjectionQuery
             GROUP BY bi.owner_type, bi.owner_id
         SQL;
 
+        $blockTypeCapability = $ownerType === 'entry' ? 'supports_entries' : 'supports_pages';
         $blockTypes = <<<SQL
             SELECT {$aggregate}({$object}(
                        'id', b.id,
@@ -174,6 +178,7 @@ final class CmsWorkspaceProjectionQuery
                        is_container, is_active, sort_order
                 FROM cms_content_blocks
                 WHERE is_active = 1
+                  AND {$blockTypeCapability} = 1
                 ORDER BY sort_order ASC, name ASC, id ASC
             ) b
         SQL;
@@ -197,6 +202,9 @@ final class CmsWorkspaceProjectionQuery
                 ORDER BY sort_order ASC, id ASC
             ) l
         SQL;
+        if (! in_array('cms.languages.read', $permissions, true)) {
+            $languages = "SELECT {$emptyArray} AS languages_json";
+        }
 
         $collectionTranslations = <<<SQL
             SELECT t.collection_id,
@@ -245,6 +253,9 @@ final class CmsWorkspaceProjectionQuery
             ) c
             LEFT JOIN ({$collectionTranslations}) ct ON ct.collection_id = c.id
         SQL;
+        if (! in_array('cms.collections.read', $permissions, true)) {
+            $collections = "SELECT {$emptyArray} AS collections_json";
+        }
 
         $pageOptionTranslations = <<<SQL
             SELECT t.page_id,
@@ -290,6 +301,9 @@ final class CmsWorkspaceProjectionQuery
             ) p
             LEFT JOIN ({$pageOptionTranslations}) pt ON pt.page_id = p.id
         SQL;
+        if (! in_array('cms.pages.read', $permissions, true)) {
+            $pages = "SELECT {$emptyArray} AS pages_json";
+        }
 
         $entryOptionTranslations = <<<SQL
             SELECT t.entry_id,
@@ -334,6 +348,9 @@ final class CmsWorkspaceProjectionQuery
             ) e
             LEFT JOIN ({$entryOptionTranslations}) et ON et.entry_id = e.id
         SQL;
+        if (! in_array('cms.entries.read', $permissions, true)) {
+            $entries = "SELECT {$emptyArray} AS entries_json";
+        }
 
         $forms = <<<SQL
             SELECT {$aggregate}({$object}('form_key', f.form_key){$aggregateSuffix}) AS forms_json
@@ -345,6 +362,9 @@ final class CmsWorkspaceProjectionQuery
                 LIMIT 100
             ) f
         SQL;
+        if (! in_array('cms.forms.read', $permissions, true)) {
+            $forms = "SELECT {$emptyArray} AS forms_json";
+        }
 
         $categoryTranslations = <<<SQL
             SELECT t.category_id,

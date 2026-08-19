@@ -81,7 +81,11 @@ final class CmsAdminWorkspaceSourceTest extends CIUnitTestCase
             new FileUrlResolver($metaResolver),
         );
 
-        $result = $source->pageWorkspace(17, 20, ['cms.pages.read']);
+        $result = $source->pageWorkspace(17, 20, [
+            'cms.pages.read',
+            'cms.languages.read',
+            'cms.collections.read',
+        ]);
 
         $this->assertSame('Quiénes somos', $result['page']['title']);
         $this->assertSame('quienes-somos', $result['page']['translations'][0]['slug']);
@@ -133,12 +137,54 @@ final class CmsAdminWorkspaceSourceTest extends CIUnitTestCase
             new FileUrlResolver($metaResolver),
         );
 
-        $result = $source->entryWorkspace(7, 20, ['cms.entries.read']);
+        $result = $source->entryWorkspace(7, 20, [
+            'cms.entries.read',
+            'cms.languages.read',
+            'cms.collections.read',
+        ]);
 
         $this->assertSame('Entrada', $result['entry']['title']);
         $this->assertCount(1, $result['blocks']);
         $this->assertSame('rich_text', $result['blockTypes'][5]['block_key']);
         $this->assertSame(20, $result['block']['id']);
+    }
+
+    public function testDoesNotProjectUnscopedCmsCatalogs(): void
+    {
+        $this->readDb->table('cms_languages')->insert([
+            'id' => 1, 'code' => 'es', 'name' => 'Español', 'native_name' => 'Español',
+            'is_default' => 1, 'is_active' => 1, 'sort_order' => 1,
+        ]);
+        $this->readDb->table('cms_pages')->insert([
+            'id' => 17, 'page_type' => 'about', 'status' => 'published', 'is_in_sitemap' => 1,
+            'sort_order' => 1,
+        ]);
+        $this->readDb->table('cms_collections')->insert([
+            'id' => 3, 'collection_key' => 'news', 'collection_type' => 'editorial', 'is_active' => 1, 'sort_order' => 1,
+        ]);
+        $this->readDb->table('cms_entries')->insert([
+            'id' => 7, 'collection_id' => 3, 'workflow_status' => 'published', 'is_featured' => 0,
+            'view_count' => 0, 'sort_order' => 1, 'is_in_sitemap' => 1,
+        ]);
+
+        $metaResolver = new class () implements FileMetaResolverInterface {
+            public function resolveMany(array $fileIds, string $context = 'public'): array
+            {
+                return [];
+            }
+        };
+        $source = new AdminCmsWorkspaceSource(
+            $this->readDb,
+            new FileUrlResolver($metaResolver),
+        );
+
+        $result = $source->entryWorkspace(7, null, ['cms.entries.read']);
+
+        $this->assertSame([], $result['languages']);
+        $this->assertSame([], $result['collections']);
+        $this->assertSame([], $result['pages']);
+        $this->assertSame([], $result['forms'] ?? []);
+        $this->assertNotEmpty($result['entries']);
     }
 
     private function createSchema(): void
