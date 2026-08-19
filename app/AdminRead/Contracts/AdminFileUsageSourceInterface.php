@@ -4,25 +4,12 @@ declare(strict_types=1);
 
 namespace App\AdminRead\Contracts;
 
-/** Permission-aware readers for the Admin file-usage projection. */
+/** Permission-aware reader for the Admin file-usage snapshot. */
 interface AdminFileUsageSourceInterface
 {
     /**
      * @param list<string> $permissions
-     * @return list<array<string, mixed>>
+     * @return array{complete: bool, source: array<string, string>, usages: list<array<string, mixed>>}
      */
-    public function readHub(int $fileId, string $bearerToken, array $permissions): array;
-
-    /**
-     * @param list<string> $permissions
-     * @return list<array<string, mixed>>
-     */
-    public function readCms(int $fileId, array $permissions): array;
-
-    /**
-     * @param list<array<string, mixed>> $hubUsages
-     * @param list<array<string, mixed>> $cmsUsages
-     * @return list<array<string, mixed>>
-     */
-    public function merge(array $hubUsages, array $cmsUsages): array;
+    public function readSnapshot(int $fileId, string $bearerToken, array $permissions): array;
 }

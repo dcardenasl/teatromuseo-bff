@@ -6,117 +6,51 @@ namespace App\AdminRead\Files;
 
 use App\AdminRead\Contracts\AdminFileUsageSourceInterface;
 use App\AdminRead\Support\PermissionGuard;
-use App\AdminRead\Support\ReadOnlyQuery;
 use App\Libraries\Hub\HubClient;
-use CodeIgniter\Database\BaseConnection;
+use RuntimeException;
 
-/** Hub + CMS file-usage reader with stable, context-aware deduplication. */
+/** Hub-authoritative file-usage snapshot reader for the Admin. */
 final class AdminFileUsageSource implements AdminFileUsageSourceInterface
 {
-    /** Defensive cap: a single heavily-reused file (e.g. a hero image) should
-     * never be able to return an unbounded number of usage rows. */
-    private const MAX_USAGES = 500;
-
-    /** @param BaseConnection<mixed,mixed> $cmsDb */
     public function __construct(
         private readonly HubClient $hubClient,
-        private readonly BaseConnection $cmsDb,
     ) {
     }
 
     /**
      * @param list<string> $permissions
-     * @return list<array<string, mixed>>
+     * @return array{complete: bool, source: array<string, string>, usages: list<array<string, mixed>>}
      */
-    public function readHub(int $fileId, string $bearerToken, array $permissions): array
+    public function readSnapshot(int $fileId, string $bearerToken, array $permissions): array
     {
         PermissionGuard::require($permissions, 'files.read');
 
-        $payload = $this->hubClient->get('/api/v1/files/' . $fileId . '/usages', $bearerToken);
-        $rows    = is_array($payload['usages'] ?? null) ? $payload['usages'] : $payload;
-
-        return $this->normalizeRows($rows, 'hub');
-    }
-
-    /**
-     * @param list<string> $permissions
-     * @return list<array<string, mixed>>
-     */
-    public function readCms(int $fileId, array $permissions): array
-    {
-        PermissionGuard::require($permissions, 'cms.entries.read');
-
-        if (! $this->cmsDb->tableExists('cms_file_references')) {
-            throw new \RuntimeException('CMS file usage registry is unavailable.');
+        $payload = $this->hubClient->get('/api/v1/files/' . $fileId . '/usage-snapshot', $bearerToken);
+        $snapshot = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+        if (! is_array($snapshot['usages'] ?? null)) {
+            throw new RuntimeException('Hub returned an invalid file usage snapshot.');
         }
 
-        $rows = ReadOnlyQuery::rows(
-            $this->cmsDb->table('cms_file_references fr')
-                ->select('fr.resource_type, fr.resource_id, fr.role, fr.label, bi.owner_type, bi.owner_id, bt.block_key, bt.name as block_name')
-                ->join('cms_block_instances bi', 'bi.id = fr.block_instance_id', 'left')
-                ->join('cms_content_blocks bt', 'bt.id = bi.block_id', 'left')
-                ->where('fr.hub_file_id', $fileId)
-                ->orderBy('fr.resource_type', 'ASC')
-                ->orderBy('fr.resource_id', 'ASC')
-                ->orderBy('fr.role', 'ASC')
-                ->limit(self::MAX_USAGES),
-            'CMS file usages',
-        );
-
-        return array_values(array_map(function (array $row) use ($fileId): array {
-            $resourceType = (string) ($row['resource_type'] ?? '');
-            $usage = [
-                'source'      => 'domain',
-                'resource'    => match ($resourceType) {
-                    'entry' => 'entries',
-                    'page' => 'pages',
-                    'setting' => 'settings',
-                    'block_instance' => 'block_instances',
-                    default => $resourceType,
-                },
-                'resource_id' => (int) ($row['resource_id'] ?? 0),
-                'role'        => (string) ($row['role'] ?? 'default'),
-                'label'       => isset($row['label']) && trim((string) $row['label']) !== ''
-                    ? (string) $row['label']
-                    : null,
-            ];
-
-            if ($resourceType === 'block_instance') {
-                $usage['context'] = [
-                    'owner_type' => (string) ($row['owner_type'] ?? ''),
-                    'owner_id'   => (int) ($row['owner_id'] ?? 0),
-                    'file_id'    => $fileId,
-                    'block_key'  => (string) ($row['block_key'] ?? ''),
-                    'block_name' => (string) ($row['block_name'] ?? ''),
-                ];
-            }
-
-            return $usage;
-        }, $rows));
-    }
-
-    /**
-     * Keep the first row for every stable usage identity. A CMS row with a
-     * context replaces a Hub row without one, while preserving first-seen
-     * order for stable UI output.
-     *
-     * @param list<array<string, mixed>> $hubUsages
-     * @param list<array<string, mixed>> $cmsUsages
-     * @return list<array<string, mixed>>
-     */
-    public function merge(array $hubUsages, array $cmsUsages): array
-    {
         $merged = [];
-        foreach (array_merge($hubUsages, $cmsUsages) as $usage) {
+        foreach ($this->normalizeRows($snapshot['usages'], 'hub') as $usage) {
             $key = $this->usageKey($usage);
-            if (! isset($merged[$key]) || $this->hasContext($usage)) {
-                if (! isset($merged[$key]) || ! $this->hasContext($merged[$key])) {
-                    $merged[$key] = $usage;
-                }
+            if (! isset($merged[$key]) || (! $this->hasContext($merged[$key]) && $this->hasContext($usage))) {
+                $merged[$key] = $usage;
             }
         }
 
-        return array_values($merged);
+        $source = [];
+        foreach (($snapshot['source'] ?? []) as $key => $state) {
+            if (is_string($key) && is_string($state)) {
+                $source[$key] = $state;
+            }
+        }
+
+        return [
+            'complete' => ($snapshot['complete'] ?? false) === true,
+            'source' => $source,
+            'usages' => array_values($merged),
+        ];
     }
 
     /**

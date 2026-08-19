@@ -33,17 +33,15 @@ final class AdminFileUsagesTest extends ApiTestCase
     {
         $this->mockEffectiveUser();
         $source = $this->createMock(AdminFileUsageSourceInterface::class);
-        $source->expects($this->once())->method('readHub')->willReturn([['resource' => 'pages', 'resource_id' => 2]]);
-        $source->expects($this->once())->method('readCms')->willReturn([['resource' => 'block_instances', 'resource_id' => 3]]);
         $source->expects($this->once())
-            ->method('merge')
-            ->with(
-                [['resource' => 'pages', 'resource_id' => 2]],
-                [['resource' => 'block_instances', 'resource_id' => 3]],
-            )
+            ->method('readSnapshot')
             ->willReturn([
-                ['resource' => 'pages', 'resource_id' => 2],
-                ['resource' => 'block_instances', 'resource_id' => 3],
+                'complete' => true,
+                'source' => ['hub' => 'ok', 'cms' => 'ok', 'state' => 'ok'],
+                'usages' => [
+                    ['resource' => 'pages', 'resource_id' => 2],
+                    ['resource' => 'block_instances', 'resource_id' => 3],
+                ],
             ]);
         Services::injectMock('adminReadFileUsages', $source);
 
@@ -58,16 +56,11 @@ final class AdminFileUsagesTest extends ApiTestCase
         $this->assertCount(2, $body['data']['sections']['usages']);
     }
 
-    public function testMarksResultIncompleteWhenCmsSourceFails(): void
+    public function testMarksResultUnavailableWhenHubSnapshotFails(): void
     {
         $this->mockEffectiveUser();
         $source = $this->createMock(AdminFileUsageSourceInterface::class);
-        $source->method('readHub')->willReturn([['resource' => 'pages', 'resource_id' => 2]]);
-        $source->method('readCms')->willThrowException(new RuntimeException('cms unavailable'));
-        $source->expects($this->once())
-            ->method('merge')
-            ->with([['resource' => 'pages', 'resource_id' => 2]], [])
-            ->willReturn([['resource' => 'pages', 'resource_id' => 2]]);
+        $source->method('readSnapshot')->willThrowException(new RuntimeException('hub unavailable'));
         Services::injectMock('adminReadFileUsages', $source);
 
         $result = $this
@@ -77,18 +70,19 @@ final class AdminFileUsagesTest extends ApiTestCase
         $body = $this->decodeBody($result);
         $this->assertSame(200, $result->response()->getStatusCode());
         $this->assertFalse($body['data']['complete']);
-        $this->assertSame('ok', $body['data']['source']['hub']);
-        $this->assertSame('unavailable', $body['data']['source']['cms']);
-        $this->assertSame('partial', $body['data']['source']['state']);
+        $this->assertSame('unavailable', $body['data']['source']['hub']);
+        $this->assertSame('unavailable', $body['data']['source']['state']);
     }
 
     public function testEmptySuccessfulSourcesAreCompleteAndEmpty(): void
     {
         $this->mockEffectiveUser();
         $source = $this->createMock(AdminFileUsageSourceInterface::class);
-        $source->method('readHub')->willReturn([]);
-        $source->method('readCms')->willReturn([]);
-        $source->method('merge')->with([], [])->willReturn([]);
+        $source->method('readSnapshot')->willReturn([
+            'complete' => true,
+            'source' => ['hub' => 'ok', 'cms' => 'ok', 'state' => 'ok'],
+            'usages' => [],
+        ]);
         Services::injectMock('adminReadFileUsages', $source);
 
         $result = $this

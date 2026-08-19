@@ -86,10 +86,7 @@ final class AdminReadContainer
 
     public static function fileUsages(): AdminFileUsageSource
     {
-        return new AdminFileUsageSource(
-            \Config\Services::hubDashboardClient(),
-            self::database('cms_readonly'),
-        );
+        return new AdminFileUsageSource(\Config\Services::hubDashboardClient());
     }
 
     public static function eventLookups(): AdminEventLookupSource
