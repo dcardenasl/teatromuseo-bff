@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trusted multi-caller `X-App-Key` + kiosk catalog curation** — `WebAppKeyRequiredFilter`
+  now accepts a dedicated `TOTEM_BFF_API_KEY` alongside the existing web key, records the
+  resolved caller (`web`/`totem`) in `App\Support\PublicReadCallerContext`, and the public-read
+  catalog seam applies `collection_items.show_in_totem` curation only for the totem caller.
+  `GET /api/v1/public/{locale}/catalog/categories|techniques` also accept `with_counts=1` to
+  return a per-row `item_count` matching that same curated eligibility, without a separate
+  full-listing fetch.
+- **`last_occurrence_at` in the public event listing** — `GET /api/v1/public/{locale}/events`
+  now exposes `last_occurrence_at` alongside `next_occurrence_at`, so a consumer like the totem
+  kiosk can show the real date of a past event used as filler content.
 - **`GET /api/v1/public-read/{locale}/page-resolve/{path}`** — domain detail pages
   (`template_catalog_item`/`template_event_item`) now inherit their owning CMS
   template's `robots`, `og_type`, `og_image` and `schema_data`, carry
@@ -59,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`GET /me/admin-file-usages`** — the file-usage source now consumes the Hub's authoritative
+  `usage-snapshot` endpoint instead of issuing a second CMS query to reconstruct the same
+  context; per-source health and completeness now come straight from the Hub, and the seam's
+  stable deduplication is preserved.
 - **`CmsWorkspaceProjectionQuery`** — block types are now filtered by the owner's
   capability (`supports_pages`/`supports_entries`), and the languages, collections,
   pages, entries and forms catalogs are only projected when the caller holds the
