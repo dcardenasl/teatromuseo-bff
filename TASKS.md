@@ -177,10 +177,11 @@
   cliente, endpoint, regresión de `/me/dashboard` y `composer quality`.
 
 - [x] **INFRA-ROBUST-01 — Modelo de despliegue confirmado.** Cerrada
-  2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman FTP
-  sobre hosting/cPanel; el BFF no necesita un Dockerfile productivo para ese
-  mecanismo. La creación de `www.conf` y el dimensionamiento de FPM quedan
-  fuera de lo que puede decidirse desde el repositorio.
+  2026-08-15. La evidencia de beta y los artefactos `.deploy` confirman
+  hosting/cPanel; el runtime usa el helper común con FTPS verificado por
+  defecto. El BFF no necesita un Dockerfile productivo para ese mecanismo. La
+  creación de `www.conf` y el dimensionamiento de FPM quedan fuera de lo que
+  puede decidirse desde el repositorio.
 
 - [x] **BFF-PAGE-05 — Índice de colección de respaldo.** Cerrada
   2026-08-14. `PageResolver` sintetiza `collection_fallback_index` solo para
