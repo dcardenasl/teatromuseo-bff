@@ -18,7 +18,7 @@
                     "System"
                 ],
                 "summary": "Overall health check",
-                "description": "Aggregates the hub probe with local disk/writable checks. Returns 503 when any check is unhealthy.",
+                "description": "Detailed diagnostic only: aggregates the hub probe, four SELECT-only read-database probes, and local disk/writable checks. Do not poll this endpoint as a liveness or readiness monitor on low-capacity hosting.",
                 "operationId": "8134f87e7bbe4107dc228a3b8d62d619",
                 "responses": {
                     "200": {
@@ -37,6 +37,9 @@
                                         "checks": {
                                             "properties": {
                                                 "hub": {
+                                                    "type": "object"
+                                                },
+                                                "databases": {
                                                     "type": "object"
                                                 },
                                                 "disk": {
@@ -1369,6 +1372,13 @@
                                                         "type": "string"
                                                     }
                                                 },
+                                                "diagnostics": {
+                                                    "description": "Observed timing of the same bounded source operations used to build the snapshot, plus the database time of each existing read projection and cheap local hosting disk/writable checks. It does not add database probes or upstream health requests.",
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "object"
+                                                    }
+                                                },
                                                 "sections": {
                                                     "type": "object"
                                                 }
@@ -1888,6 +1898,161 @@
                     },
                     "503": {
                         "description": "Hub Metrics workspace source unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-cms/categories/bootstrap": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "CMS category list bootstrap",
+                "description": "OpenAPI contracts for the Admin module read projections.",
+                "operationId": "cc067beb70e91a65c7dbe9787ecf45eb",
+                "responses": {
+                    "200": {
+                        "description": "Bounded category, collection, language and parent projections"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-cms/categories/{categoryId}/bootstrap": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "CMS category workspace bootstrap",
+                "operationId": "838ce41681af2ca9481cc2d2d7a85b65",
+                "parameters": [
+                    {
+                        "name": "categoryId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bounded category editor projection"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-catalog/collection-items/list-bootstrap": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "Catalog collection-item list bootstrap",
+                "operationId": "96907bca177f85be6270ac405f917c9e",
+                "responses": {
+                    "200": {
+                        "description": "Bounded collection-item category filters"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-event/events/list-bootstrap": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "Event list bootstrap",
+                "operationId": "88dcf3f88d6ba8eaa172105792ef6ab0",
+                "responses": {
+                    "200": {
+                        "description": "Bounded event type filters"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-catalog/techniques/workspace": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "Catalog technique create workspace",
+                "operationId": "bc580316c0e1798ce28f7a66e4cbd6c3",
+                "responses": {
+                    "200": {
+                        "description": "Technique create options and languages"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/me/admin-catalog/techniques/{techniqueId}/workspace": {
+            "get": {
+                "tags": [
+                    "Me"
+                ],
+                "summary": "Catalog technique edit workspace",
+                "operationId": "ba8e6e8d07b6379dfa10a755e4cc2610",
+                "parameters": [
+                    {
+                        "name": "techniqueId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Technique editor options and languages"
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token"
                     }
                 },
                 "security": [
