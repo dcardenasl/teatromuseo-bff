@@ -27,15 +27,13 @@ Client (SPA/mobile)  →  ci4-bff-starter (:8188)
   translations, file usages, Event lookups and CMS bootstrap/workspace reads.
   These exceptions are local to `teatromuseo-bff` and do not change the
   `ci4-bff-starter` template contract.
-  - **Documented exception:** `AdminCmsWizardSource` and `AdminCmsBootstrapSource`
-    (under `app/AdminRead/Cms/`) additionally call the CMS Domain over
-    authenticated HTTP via `DomainClient`, instead of reading `cms_readonly`
-    directly — `AdminCmsWizardSource` exclusively, `AdminCmsBootstrapSource` as
-    a fallback path alongside its direct-SQL projections. This reuses an
-    existing CMS Domain compound endpoint (`/api/v1/cms/wizard/config`) rather
-    than adding a second HTTP call or duplicating its business rules in SQL —
-    it is a deliberate exception to the "SQL-only" rule above, not a violation
-    of it.
+  - **Documented exception:** `AdminCmsWizardSource` (under
+    `app/AdminRead/Cms/`) calls the CMS Domain over authenticated HTTP because
+    its dynamic block configuration is owned by the existing compound wizard
+    endpoint (`/api/v1/cms/wizard/config`). Form options, menu editor and site
+    identity bootstraps use only their direct SQL projections; they have no
+    HTTP fallback. A missing `cms_readonly` connection fails closed instead of
+    resurrecting the old multi-request path.
   - **Cross-seam reuse:** `AdminReadContainer::cmsWorkspace()` constructs
     `App\PublicRead\Cms\FileUrlResolver` and
     `App\PublicRead\Support\DirectDbFileMetaResolver` — both `PublicRead`

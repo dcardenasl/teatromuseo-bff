@@ -148,9 +148,8 @@ final class AdminReadContainer
     public static function cmsBootstrap(): AdminCmsBootstrapSource
     {
         return new AdminCmsBootstrapSource(
-            \Config\Services::domainClient('cms'),
-            \Config\Services::cache(),
             self::database('cms_readonly'),
+            \Config\Services::cache(),
         );
     }
 

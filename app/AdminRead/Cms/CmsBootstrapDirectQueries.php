@@ -9,11 +9,9 @@ use App\AdminRead\Support\ReadOnlyQuery;
 use CodeIgniter\Database\BaseConnection;
 
 /**
- * The direct-SQL half of {@see AdminCmsBootstrapSource}'s dual-path design:
- * one bounded projection per bootstrap screen, read straight from
- * `cms_readonly` instead of the CMS Domain's HTTP API. Used whenever the
- * BFF has a configured read connection (`$readDb !== null`); the HTTP
- * fallback path stays in the main class.
+ * One bounded projection per bootstrap screen, read straight from
+ * `cms_readonly`. The CMS Domain HTTP path was removed from the bootstrap
+ * flow so these projections are the only production implementation.
  *
  * Extracted from `AdminCmsBootstrapSource::directPageFormOptions()`,
  * `::directEntryFormOptions()`, `::directMenuEditorBootstrap()`,

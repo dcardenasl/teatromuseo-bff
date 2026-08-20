@@ -35,7 +35,7 @@ final class AdminCmsBootstrapTest extends ApiTestCase
         $source = $this->createMock(AdminCmsBootstrapSourceInterface::class);
         $source->expects($this->once())
             ->method('entryFormOptions')
-            ->with(null, $permissions, 'valid-token')
+            ->with(null, $permissions)
             ->willReturn(['languages' => [['id' => 1]], 'collections' => []]);
         Services::injectMock('adminReadCmsBootstrap', $source);
 
@@ -61,7 +61,7 @@ final class AdminCmsBootstrapTest extends ApiTestCase
         $source = $this->createMock(AdminCmsBootstrapSourceInterface::class);
         $source->expects($this->once())
             ->method('pageFormOptions')
-            ->with(35, $permissions, 'valid-token')
+            ->with(35, $permissions)
             ->willReturn(['pages' => []]);
         Services::injectMock('adminReadCmsBootstrap', $source);
 

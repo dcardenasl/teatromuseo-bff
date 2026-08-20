@@ -19,8 +19,8 @@ final class AdminCmsBootstrapController extends BaseProxyController
     {
         $id = $this->optionalPositiveId($entryId, 'entryId');
 
-        return $this->respond('entry-form-options', static function (array $permissions, string $bearer) use ($id): array {
-            return Services::adminReadCmsBootstrap()->entryFormOptions($id, $permissions, $bearer);
+        return $this->respond('entry-form-options', static function (array $permissions) use ($id): array {
+            return Services::adminReadCmsBootstrap()->entryFormOptions($id, $permissions);
         });
     }
 
@@ -28,8 +28,8 @@ final class AdminCmsBootstrapController extends BaseProxyController
     {
         $id = $this->optionalPositiveId($pageId, 'pageId');
 
-        return $this->respond('page-form-options', static function (array $permissions, string $bearer) use ($id): array {
-            return Services::adminReadCmsBootstrap()->pageFormOptions($id, $permissions, $bearer);
+        return $this->respond('page-form-options', static function (array $permissions) use ($id): array {
+            return Services::adminReadCmsBootstrap()->pageFormOptions($id, $permissions);
         });
     }
 
@@ -38,34 +38,33 @@ final class AdminCmsBootstrapController extends BaseProxyController
         $menu = $this->requiredPositiveId($menuId, 'menuId');
         $item = $this->optionalPositiveId($itemId, 'itemId');
 
-        return $this->respond('menu-editor-bootstrap', static function (array $permissions, string $bearer) use ($menu, $item): array {
-            return Services::adminReadCmsBootstrap()->menuEditorBootstrap($menu, $item, $permissions, $bearer);
+        return $this->respond('menu-editor-bootstrap', static function (array $permissions) use ($menu, $item): array {
+            return Services::adminReadCmsBootstrap()->menuEditorBootstrap($menu, $item, $permissions);
         });
     }
 
     public function siteIdentityBootstrap(): ResponseInterface
     {
-        return $this->respond('site-identity-bootstrap', static function (array $permissions, string $bearer): array {
-            return Services::adminReadCmsBootstrap()->siteIdentityBootstrap($permissions, $bearer);
+        return $this->respond('site-identity-bootstrap', static function (array $permissions): array {
+            return Services::adminReadCmsBootstrap()->siteIdentityBootstrap($permissions);
         });
     }
 
-    /** @param callable(list<string>, string): array<string, mixed> $reader */
+    /** @param callable(list<string>): array<string, mixed> $reader */
     private function respond(string $context, callable $reader): ResponseInterface
     {
         $authContext = ContextHolder::get();
-        $bearer = $this->extractBearerToken();
-        if ($authContext?->user_id === null || $bearer === null) {
+        if ($authContext?->user_id === null) {
             throw new AuthenticationException('Missing authenticated user context.');
         }
 
-        return $this->handleOperation(function () use ($authContext, $bearer, $reader, $context): ResponseInterface {
+        return $this->handleOperation(function () use ($authContext, $reader, $context): ResponseInterface {
             return $this->response->setJSON(ApiResponse::success([
                 'version'      => 1,
                 'generated_at' => date(DATE_ATOM),
                 'context'      => $context,
                 'source'       => ['cms' => 'ok', 'state' => 'ok'],
-                'sections'     => $reader($authContext->permissions, $bearer),
+                'sections'     => $reader($authContext->permissions),
             ]));
         }, 'CMS ' . $context . ' source');
     }
