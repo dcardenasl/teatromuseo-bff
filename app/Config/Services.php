@@ -202,6 +202,24 @@ class Services extends BaseService
         return \App\AdminRead\AdminReadContainer::catalogCollectionItemWorkspace();
     }
 
+    public static function adminReadCatalogCollectionItemList(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogCollectionItemListSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogCollectionItemList');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogCollectionItemList();
+    }
+
+    public static function adminReadCatalogTechnique(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogTechniqueSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogTechnique');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogTechnique();
+    }
+
     public static function adminReadEventDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
     {
         if ($getShared) {
@@ -218,6 +236,15 @@ class Services extends BaseService
         }
 
         return \App\AdminRead\AdminReadContainer::eventWorkspace();
+    }
+
+    public static function adminReadEventList(bool $getShared = true): \App\AdminRead\Contracts\AdminEventListSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventList');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventList();
     }
 
     public static function adminReadFileUsages(bool $getShared = true): \App\AdminRead\Contracts\AdminFileUsageSourceInterface
@@ -245,6 +272,15 @@ class Services extends BaseService
         }
 
         return \App\AdminRead\AdminReadContainer::cmsBootstrap();
+    }
+
+    public static function adminReadCmsCategory(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsCategorySourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsCategory');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsCategory();
     }
 
     public static function adminReadCmsWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface

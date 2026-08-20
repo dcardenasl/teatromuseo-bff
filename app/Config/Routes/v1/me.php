@@ -74,6 +74,26 @@ $routes->get(
     ['filter' => 'effectivepermissionsauth'],
 );
 $routes->get(
+    'me/admin-event/events/list-bootstrap',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminEventListController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-catalog/collection-items/list-bootstrap',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCatalogListController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-catalog/techniques/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCatalogTechniqueController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-catalog/techniques/(:num)/workspace',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCatalogTechniqueController::technique/$1',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
     'me/admin-cms/entry-form-options',
     '\App\Controllers\Api\V1\Me\AdminCmsBootstrapController::entryFormOptions',
     ['filter' => 'effectivepermissionsauth'],
@@ -121,5 +141,15 @@ $routes->get(
 $routes->get(
     'me/admin-cms/wizard-bootstrap',
     '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsWizardController::bootstrap',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/categories/bootstrap',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsCategoryController::index',
+    ['filter' => 'effectivepermissionsauth'],
+);
+$routes->get(
+    'me/admin-cms/categories/(:num)/bootstrap',
+    '\\App\\Controllers\\Api\\V1\\Me\\AdminCmsCategoryController::category/$1',
     ['filter' => 'effectivepermissionsauth'],
 );

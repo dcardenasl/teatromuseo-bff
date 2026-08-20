@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\AdminRead;
 
+use App\AdminRead\Catalog\AdminCatalogCollectionItemListSource;
 use App\AdminRead\Catalog\AdminCatalogCollectionItemSource;
+use App\AdminRead\Catalog\AdminCatalogTechniqueSource;
 use App\AdminRead\Catalog\CatalogDashboardSource;
 use App\AdminRead\Cms\AdminCmsBootstrapSource;
+use App\AdminRead\Cms\AdminCmsCategorySource;
 use App\AdminRead\Cms\AdminCmsWizardSource;
 use App\AdminRead\Cms\AdminCmsWorkspaceSource;
 use App\AdminRead\Cms\CmsAnalyticsDashboardSource;
 use App\AdminRead\Cms\CmsAnalyticsSource;
 use App\AdminRead\Cms\CmsDashboardSource;
 use App\AdminRead\Cms\CmsTranslationsDashboardSource;
+use App\AdminRead\Event\AdminEventListSource;
 use App\AdminRead\Event\AdminEventLookupSource;
 use App\AdminRead\Event\AdminEventWorkspaceSource;
 use App\AdminRead\Event\EventDashboardSource;
@@ -90,6 +94,23 @@ final class AdminReadContainer
         );
     }
 
+    public static function catalogCollectionItemList(): AdminCatalogCollectionItemListSource
+    {
+        return new AdminCatalogCollectionItemListSource(
+            self::database('catalog_readonly'),
+            \Config\Services::cache(),
+        );
+    }
+
+    public static function catalogTechnique(): AdminCatalogTechniqueSource
+    {
+        return new AdminCatalogTechniqueSource(
+            self::database('catalog_readonly'),
+            self::database('cms_readonly'),
+            \Config\Services::cache(),
+        );
+    }
+
     public static function eventDashboard(): EventDashboardSource
     {
         return new EventDashboardSource(self::database('event_readonly'));
@@ -100,6 +121,14 @@ final class AdminReadContainer
         return new AdminEventWorkspaceSource(
             self::database('event_readonly'),
             self::database('cms_readonly'),
+        );
+    }
+
+    public static function eventList(): AdminEventListSource
+    {
+        return new AdminEventListSource(
+            self::database('event_readonly'),
+            \Config\Services::cache(),
         );
     }
 
@@ -122,6 +151,14 @@ final class AdminReadContainer
             \Config\Services::domainClient('cms'),
             \Config\Services::cache(),
             self::database('cms_readonly'),
+        );
+    }
+
+    public static function cmsCategory(): AdminCmsCategorySource
+    {
+        return new AdminCmsCategorySource(
+            self::database('cms_readonly'),
+            \Config\Services::cache(),
         );
     }
 
