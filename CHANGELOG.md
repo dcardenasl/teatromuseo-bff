@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Menu item destinations** — CMS/catalog/event menu items now publish `is_clickable`
   alongside `custom_url`, returning `custom_url: null` and `is_clickable: false` instead
   of a broken/omitted URL when the CMS defines no valid destination.
+- **`BlockTreeResolver`** — repeated list/detail/facet/form lookups within one page
+  resolve (the same source, locale and query appearing on more than one block) are now
+  memoized per request instead of issuing a duplicate upstream/DB call for each
+  occurrence. Response shape is unchanged.
 
 ### Fixed
 
