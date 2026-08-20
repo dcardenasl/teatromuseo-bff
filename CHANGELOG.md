@@ -86,6 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolve (the same source, locale and query appearing on more than one block) are now
   memoized per request instead of issuing a duplicate upstream/DB call for each
   occurrence. Response shape is unchanged.
+- **`GET /ready`** — now probes only the Hub instead of also checking the four
+  read-only database connections; `/health` keeps the database probes for explicit
+  diagnostics. Avoids consuming scarce hosting processes/DB connections when an
+  orchestrator polls readiness every few seconds.
+- **`AdminCmsBootstrapSource`** — form options, menu editor and site identity
+  bootstraps drop the CMS Domain HTTP fallback and use only their direct SQL
+  projections; a missing `cms_readonly` connection now fails closed instead of
+  falling back to the old multi-request HTTP path.
 
 ### Fixed
 
