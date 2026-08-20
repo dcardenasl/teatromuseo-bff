@@ -63,4 +63,24 @@ final class ReadOnlyQuery
 
         return array_values($result->getResultArray());
     }
+
+    /**
+     * Execute one bounded projection and report the time spent by the
+     * database operation, including result materialization. This reuses the
+     * query that already feeds the dashboard; it never issues a second probe.
+     *
+     * @param BaseConnection<mixed,mixed> $db
+     * @param list<mixed> $bindings
+     * @return array{rows: list<array<string, mixed>>, duration_ms: float}
+     */
+    public static function timedSql(BaseConnection $db, string $sql, array $bindings, string $label): array
+    {
+        $startedAt = hrtime(true);
+        $rows = self::sql($db, $sql, $bindings, $label);
+
+        return [
+            'rows' => $rows,
+            'duration_ms' => round((hrtime(true) - $startedAt) / 1_000_000, 2),
+        ];
+    }
 }

@@ -43,6 +43,12 @@ use OpenApi\Attributes as OA;
                                     'state' => 'partial',
                                 ],
                             ),
+                            new OA\Property(
+                                property: 'diagnostics',
+                                type: 'object',
+                                description: 'Observed timing of the same bounded source operations used to build the snapshot, plus the database time of each existing read projection and cheap local hosting disk/writable checks. It does not add database probes or upstream health requests.',
+                                additionalProperties: new OA\AdditionalProperties(type: 'object'),
+                            ),
                             new OA\Property(property: 'sections', type: 'object'),
                         ],
                     ),

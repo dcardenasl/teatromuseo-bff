@@ -26,8 +26,11 @@ final class BaseProxyControllerTest extends CIUnitTestCase
             'cms' => static fn (): array => ['pages' => 7],
         ]);
 
-        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $data['hub']);
-        $this->assertSame(['state' => 'ok', 'data' => ['pages' => 7]], $data['cms']);
+        $this->assertSame('ok', $data['hub']['state']);
+        $this->assertSame(['users' => 4], $data['hub']['data']);
+        $this->assertIsFloat($data['hub']['duration_ms']);
+        $this->assertSame('ok', $data['cms']['state']);
+        $this->assertSame(['pages' => 7], $data['cms']['data']);
     }
 
     public function testAggregatePartialDataMarksAllFailedSourcesUnavailable(): void
@@ -41,8 +44,11 @@ final class BaseProxyControllerTest extends CIUnitTestCase
             },
         ]);
 
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['hub']);
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['cms']);
+        $this->assertSame('unavailable', $data['hub']['state']);
+        $this->assertSame([], $data['hub']['data']);
+        $this->assertIsFloat($data['hub']['duration_ms']);
+        $this->assertSame('unavailable', $data['cms']['state']);
+        $this->assertSame([], $data['cms']['data']);
     }
 
     public function testAggregatePartialDataContinuesAfterOneSourceFails(): void
@@ -66,9 +72,15 @@ final class BaseProxyControllerTest extends CIUnitTestCase
         ]);
 
         $this->assertSame(['hub', 'cms', 'event'], $order);
-        $this->assertSame(['state' => 'ok', 'data' => ['users' => 4]], $data['hub']);
-        $this->assertSame(['state' => 'unavailable', 'data' => []], $data['cms']);
-        $this->assertSame(['state' => 'ok', 'data' => ['events' => 2]], $data['event']);
+        $this->assertSame('ok', $data['hub']['state']);
+        $this->assertSame(['users' => 4], $data['hub']['data']);
+        $this->assertIsFloat($data['hub']['duration_ms']);
+        $this->assertSame('unavailable', $data['cms']['state']);
+        $this->assertSame([], $data['cms']['data']);
+        $this->assertIsFloat($data['cms']['duration_ms']);
+        $this->assertSame('ok', $data['event']['state']);
+        $this->assertSame(['events' => 2], $data['event']['data']);
+        $this->assertIsFloat($data['event']['duration_ms']);
     }
 
     public function testAggregatePartialDataRecordsSourceOutcomesWhenTelemetryIsActive(): void
@@ -121,7 +133,7 @@ final class BaseProxyControllerTest extends CIUnitTestCase
 
     /**
      * @param array<string, callable(): array<string, mixed>> $calls
-     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>, duration_ms: float}>
      */
     private function runAggregatePartialData(array $calls): array
     {
@@ -136,7 +148,7 @@ final class TestableBaseProxyController extends BaseProxyController
 {
     /**
      * @param array<string, callable(): array<string, mixed>> $calls
-     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>, duration_ms: float}>
      */
     public function runAggregatePartialData(array $calls): array
     {

@@ -10,7 +10,7 @@ interface AdminDashboardSourceInterface
      * Read the source projection visible to the supplied permission scope.
      *
      * @param list<string> $permissions
-     * @return array{sections: array<string, mixed>}
+     * @return array{sections: array<string, mixed>, diagnostics?: array<string, mixed>}
      */
     public function read(array $permissions): array;
 }

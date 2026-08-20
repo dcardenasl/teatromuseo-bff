@@ -73,6 +73,12 @@ final class AdminDashboardTest extends ApiTestCase
         $this->assertSame('ok', $body['data']['source']['catalog']);
         $this->assertSame('ok', $body['data']['source']['event']);
         $this->assertSame('ok', $body['data']['source']['state']);
+        $this->assertIsNumeric($body['data']['diagnostics']['hub']['latency_ms']);
+        $this->assertSame('healthy', $body['data']['diagnostics']['hub']['checks']['upstream']['status']);
+        $this->assertSame('healthy', $body['data']['diagnostics']['cms']['checks']['projection']['status']);
+        $this->assertIsNumeric($body['data']['diagnostics']['cms']['checks']['database']['response_time_ms']);
+        $this->assertArrayHasKey('disk', $body['data']['diagnostics']['hosting']['checks']);
+        $this->assertArrayHasKey('writable', $body['data']['diagnostics']['hosting']['checks']);
         $this->assertSame(['pages' => 7], $body['data']['sections']['cms']['counts']);
         $this->assertSame('7d', $body['data']['sections']['analytics']['analytics']['period']);
         $this->assertSame('es', $body['data']['sections']['translations']['translations'][0]['code']);
@@ -205,7 +211,17 @@ final class AdminDashboardTest extends ApiTestCase
             } else {
                 $reader->method('read')
                     ->with($this->effectivePermissionScope())
-                    ->willReturn(['sections' => $sections]);
+                    ->willReturn([
+                        'sections' => $sections,
+                        'diagnostics' => [
+                            'checks' => [
+                                'database' => [
+                                    'status' => 'healthy',
+                                    'response_time_ms' => 1.25,
+                                ],
+                            ],
+                        ],
+                    ]);
             }
             Services::injectMock($service, $reader);
         }

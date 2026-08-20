@@ -89,6 +89,15 @@ class Services extends BaseService
         return new \dcardenasl\Ci4ApiCore\Monitoring\HealthChecker();
     }
 
+    public static function runtimeDiagnostics(bool $getShared = true): \App\Monitoring\RuntimeDiagnostics
+    {
+        if ($getShared) {
+            return static::getSharedInstance('runtimeDiagnostics');
+        }
+
+        return new \App\Monitoring\RuntimeDiagnostics();
+    }
+
     /**
      * The Request Service
      *

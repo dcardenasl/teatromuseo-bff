@@ -50,7 +50,7 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
 
     /**
      * @param list<string> $permissions
-     * @return array{sections: array<string, mixed>}
+     * @return array{sections: array<string, mixed>, diagnostics?: array<string, mixed>}
      */
     public function read(array $permissions): array
     {
@@ -93,7 +93,7 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
             return ['sections' => ['counts' => []]];
         }
 
-        $rows = ReadOnlyQuery::sql(
+        $query = ReadOnlyQuery::timedSql(
             $this->db,
             'SELECT row_type, resource, item_id, item_title, item_slug, updated_at, total
              FROM (' . implode("\nUNION ALL\n", $branches) . ') dashboard_rows
@@ -101,6 +101,7 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
             [],
             'Catalog dashboard projection',
         );
+        $rows = $query['rows'];
 
         $counts = [];
         $activity = [];
@@ -119,9 +120,19 @@ final class CatalogDashboardSource implements AdminDashboardSourceInterface
             ];
         }
 
-        return ['sections' => [
-            'counts' => $counts,
-            'recent_activity' => array_slice($activity, 0, 6),
-        ]];
+        return [
+            'sections' => [
+                'counts' => $counts,
+                'recent_activity' => array_slice($activity, 0, 6),
+            ],
+            'diagnostics' => [
+                'checks' => [
+                    'database' => [
+                        'status' => 'healthy',
+                        'response_time_ms' => $query['duration_ms'],
+                    ],
+                ],
+            ],
+        ];
     }
 }

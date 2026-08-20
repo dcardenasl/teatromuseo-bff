@@ -29,7 +29,7 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
 
     /**
      * @param list<string> $permissions
-     * @return array{sections: array<string, mixed>}
+     * @return array{sections: array<string, mixed>, diagnostics?: array<string, mixed>}
      */
     public function read(array $permissions): array
     {
@@ -106,7 +106,7 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
                 SQL;
         }
 
-        $rows = ReadOnlyQuery::sql(
+        $query = ReadOnlyQuery::timedSql(
             $this->db,
             'SELECT row_type, resource, item_type, item_id, updated_at, language_id,
                     title, slug, total, submission_status
@@ -115,6 +115,7 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
             [],
             'CMS dashboard projection',
         );
+        $rows = $query['rows'];
 
         $counts = [];
         $submissions = ['new' => 0, 'read' => 0, 'replied' => 0, 'spam' => 0, 'archived' => 0];
@@ -160,6 +161,16 @@ final class CmsDashboardSource implements AdminDashboardSourceInterface
             $sections['recent_activity'] = array_values(array_slice($activity, 0, 6));
         }
 
-        return ['sections' => $sections];
+        return [
+            'sections' => $sections,
+            'diagnostics' => [
+                'checks' => [
+                    'database' => [
+                        'status' => 'healthy',
+                        'response_time_ms' => $query['duration_ms'],
+                    ],
+                ],
+            ],
+        ];
     }
 }

@@ -146,7 +146,7 @@ abstract class BaseProxyController extends Controller
      * semantics.
      *
      * @param array<string, callable(): array<array-key, mixed>> $calls
-     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>}>
+     * @return array<string, array{state: 'ok'|'unavailable', data: array<string, mixed>, duration_ms: float}>
      */
     protected function aggregatePartialData(array $calls): array
     {
@@ -156,8 +156,9 @@ abstract class BaseProxyController extends Controller
             $startedAt = hrtime(true);
             try {
                 $data[$key] = [
-                    'state' => 'ok',
-                    'data'  => $call(),
+                    'state'       => 'ok',
+                    'data'        => $call(),
+                    'duration_ms' => $this->elapsedSince($startedAt),
                 ];
                 RequestTelemetry::recordSource($key, $this->elapsedSince($startedAt), 'ok', 200);
             } catch (Throwable $exception) {
@@ -171,8 +172,9 @@ abstract class BaseProxyController extends Controller
                 ));
 
                 $data[$key] = [
-                    'state' => 'unavailable',
-                    'data'  => [],
+                    'state'       => 'unavailable',
+                    'data'        => [],
+                    'duration_ms' => $this->elapsedSince($startedAt),
                 ];
             }
         }

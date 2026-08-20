@@ -51,14 +51,36 @@ final class AdminDashboardController extends BaseProxyController
 
         $sections = [];
         $source   = [];
+        $diagnostics = [];
         $states   = [];
 
         foreach ($partial as $key => $result) {
             $payload          = $result['data'];
             $sections[$key]   = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
             $source[$key]     = $result['state'];
+            $latencyMs        = round(max(0.0, (float) ($result['duration_ms'] ?? 0.0)), 2);
+            $checkName        = $key === 'hub' ? 'upstream' : 'projection';
+            $sourceDiagnostics = is_array($payload['diagnostics'] ?? null)
+                ? $payload['diagnostics']
+                : [];
+            $sourceChecks = is_array($sourceDiagnostics['checks'] ?? null)
+                ? $sourceDiagnostics['checks']
+                : [];
+            $diagnostics[$key] = [
+                'latency_ms' => $latencyMs,
+                'checks'     => array_merge([
+                    $checkName => [
+                        'status'           => $result['state'] === 'ok' ? 'healthy' : 'unhealthy',
+                        'response_time_ms' => $latencyMs,
+                    ],
+                ], $sourceChecks),
+            ];
             $states[]         = $result['state'];
         }
+
+        $diagnostics['hosting'] = [
+            'checks' => Services::runtimeDiagnostics()->check(),
+        ];
 
         $source['state'] = $this->overallState($states);
 
@@ -66,6 +88,7 @@ final class AdminDashboardController extends BaseProxyController
             'version'      => 1,
             'generated_at' => date(DATE_ATOM),
             'source'       => $source,
+            'diagnostics'  => $diagnostics,
             'sections'     => $sections,
         ]));
     }
