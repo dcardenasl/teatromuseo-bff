@@ -104,6 +104,42 @@ final class BlockTreeResolverTest extends TestCase
 
         self::assertTrue($source->cmsPreview);
     }
+
+    public function testIdenticalBlockPlansShareListDetailAndFacetReads(): void
+    {
+        $source = new FakeBlockTreeSource();
+
+        (new BlockTreeResolver($source))->resolve([
+            [
+                'block_key' => 'collection_listing',
+                'block_config' => [
+                    'source_type' => 'cms_collection',
+                    'collection_key' => 'news',
+                    'show_categories' => true,
+                ],
+            ],
+            [
+                'block_key' => 'collection_listing',
+                'block_config' => [
+                    'source_type' => 'cms_collection',
+                    'collection_key' => 'news',
+                    'show_categories' => true,
+                ],
+            ],
+            [
+                'block_key' => 'event_item_feature',
+                'block_config' => ['event_slug' => 'opening-night'],
+            ],
+            [
+                'block_key' => 'event_item_feature',
+                'block_config' => ['event_slug' => 'opening-night'],
+            ],
+        ]);
+
+        self::assertSame(1, $source->cmsEntriesCalls);
+        self::assertSame(1, $source->cmsCategoryCalls);
+        self::assertSame(1, $source->eventCalls);
+    }
 }
 
 /** @internal Test source for the direct block composition port. */
@@ -112,6 +148,9 @@ final class FakeBlockTreeSource implements BlockTreeSourceInterface
     /** @var array<string, mixed> */
     public array $lastCatalogQuery = [];
     public int $catalogItemCalls = 0;
+    public int $cmsEntriesCalls = 0;
+    public int $cmsCategoryCalls = 0;
+    public int $eventCalls = 0;
     public bool $failEvents = false;
     public bool $cmsPreview = false;
 
@@ -122,6 +161,7 @@ final class FakeBlockTreeSource implements BlockTreeSourceInterface
 
     public function cmsEntries(string $locale, array $query, bool $preview = false): ApiResult
     {
+        $this->cmsEntriesCalls++;
         $this->cmsPreview = $preview;
 
         return self::success([['id' => 1]], ['total' => 1]);
@@ -129,6 +169,8 @@ final class FakeBlockTreeSource implements BlockTreeSourceInterface
 
     public function cmsCategories(string $locale, string $collectionKey): array
     {
+        $this->cmsCategoryCalls++;
+
         return [];
     }
 
@@ -168,6 +210,7 @@ final class FakeBlockTreeSource implements BlockTreeSourceInterface
 
     public function event(string $locale, string $idOrSlug, array $fields): ApiResult
     {
+        $this->eventCalls++;
         if ($this->failEvents) {
             throw new \RuntimeException('event source unavailable');
         }

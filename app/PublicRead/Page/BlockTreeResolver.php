@@ -60,11 +60,17 @@ final class BlockTreeResolver
         /** @var list<array<string, mixed>> $eventTypes */
         $eventTypes = [];
         $eventTypesLoaded = false;
+        /** @var array<string, array<string, mixed>> $listResults */
+        $listResults = [];
+        /** @var array<string, array<string, mixed>> $detailResults */
+        $detailResults = [];
+        /** @var array<string, list<array<string, mixed>>> $facetResults */
+        $facetResults = [];
 
         foreach ($plans as &$plan) {
             try {
                 if ($plan['kind'] === 'detail') {
-                    $this->resolveDetail($plan, $locale, $seededItems);
+                    $this->resolveDetail($plan, $locale, $seededItems, $detailResults);
 
                     continue;
                 }
@@ -121,7 +127,11 @@ final class BlockTreeResolver
                     $mainQuery['collection'] = (string) ($plan['collection_key'] ?? '');
                 }
                 $plan['main_query'] = $mainQuery;
-                $plan['response'] = $this->normalize($this->list($sourceType, $locale, $mainQuery, $preview));
+                $listKey = $this->cacheKey([$sourceType, $locale, $preview, $mainQuery]);
+                if (! array_key_exists($listKey, $listResults)) {
+                    $listResults[$listKey] = $this->normalize($this->list($sourceType, $locale, $mainQuery, $preview));
+                }
+                $plan['response'] = $listResults[$listKey];
                 $plan['facet_data'] = $this->facets(
                     $plan,
                     $locale,
@@ -130,6 +140,7 @@ final class BlockTreeResolver
                     $catalogCategoriesLoaded,
                     $eventTypes,
                     $eventTypesLoaded,
+                    $facetResults,
                 );
             } catch (Throwable) {
                 // A source failure is local to this block. The page and every
@@ -149,12 +160,20 @@ final class BlockTreeResolver
         }
 
         $formDefinitions = [];
+        /** @var array<string, array<string, mixed>|null> $formResults */
+        $formResults = [];
         foreach ($collector->formKeys($blocks) as $formKey) {
-            try {
-                $formDefinitions[$formKey] = $this->source->form($locale, $formKey);
-            } catch (Throwable) {
-                $formDefinitions[$formKey] = null;
+            if (array_key_exists($formKey, $formResults)) {
+                $formDefinitions[$formKey] = $formResults[$formKey];
+
+                continue;
             }
+            try {
+                $formResults[$formKey] = $this->source->form($locale, $formKey);
+            } catch (Throwable) {
+                $formResults[$formKey] = null;
+            }
+            $formDefinitions[$formKey] = $formResults[$formKey];
         }
 
         return [
@@ -167,8 +186,9 @@ final class BlockTreeResolver
 
     /** @param array<string, mixed> $plan
      *  @param array<string, list<array<string, mixed>>> $seededItems
+     *  @param array<string, array<string, mixed>> $detailResults
      */
-    private function resolveDetail(array &$plan, string $locale, array $seededItems): void
+    private function resolveDetail(array &$plan, string $locale, array $seededItems, array &$detailResults): void
     {
         $blockKey = (string) $plan['block_key'];
         $payload = is_array($plan['payload'] ?? null) ? $plan['payload'] : [];
@@ -188,16 +208,25 @@ final class BlockTreeResolver
         }
 
         $fields = $client === 'event' ? self::EVENT_DETAIL_FIELDS : self::CATALOG_DETAIL_FIELDS;
+        $detailKey = $this->cacheKey([$client, $locale, $reference['value'], $fields]);
+        if (array_key_exists($detailKey, $detailResults)) {
+            $plan['response'] = $detailResults[$detailKey];
+
+            return;
+        }
+
         $response = $client === 'event'
             ? $this->source->event($locale, $reference['value'], $fields)
             : $this->source->catalogItem($locale, $reference['value'], $fields);
-        $plan['response'] = $this->normalize($response);
+        $detailResults[$detailKey] = $this->normalize($response);
+        $plan['response'] = $detailResults[$detailKey];
     }
 
     /**
      * @param array<string, mixed> $plan
      * @param list<array<string, mixed>> $catalogCategories
      * @param list<array<string, mixed>> $eventTypes
+     * @param array<string, list<array<string, mixed>>> $facetResults
      * @return array<string, list<array<string, mixed>>>
      */
     private function facets(
@@ -208,6 +237,7 @@ final class BlockTreeResolver
         bool &$catalogCategoriesLoaded,
         array &$eventTypes,
         bool &$eventTypesLoaded,
+        array &$facetResults,
     ): array {
         if ($plan['block_key'] !== 'collection_listing') {
             return [];
@@ -218,7 +248,11 @@ final class BlockTreeResolver
         $facets = [];
         if ($queryBuilder->wantsFacet($plan, 'categories')) {
             if ($sourceType === 'cms_collection') {
-                $facets['categories'] = $this->source->cmsCategories($locale, (string) $plan['collection_key']);
+                $facetKey = $this->cacheKey(['cms_collection', $locale, (string) $plan['collection_key'], 'categories']);
+                if (! array_key_exists($facetKey, $facetResults)) {
+                    $facetResults[$facetKey] = $this->source->cmsCategories($locale, (string) $plan['collection_key']);
+                }
+                $facets['categories'] = $facetResults[$facetKey];
             } elseif ($sourceType === 'catalog_items') {
                 if (! $catalogCategoriesLoaded) {
                     try {
@@ -233,7 +267,11 @@ final class BlockTreeResolver
         }
         if ($queryBuilder->wantsFacet($plan, 'tags')) {
             if ($sourceType === 'cms_collection') {
-                $facets['tags'] = $this->source->cmsTags($locale, (string) $plan['collection_key']);
+                $facetKey = $this->cacheKey(['cms_collection', $locale, (string) $plan['collection_key'], 'tags']);
+                if (! array_key_exists($facetKey, $facetResults)) {
+                    $facetResults[$facetKey] = $this->source->cmsTags($locale, (string) $plan['collection_key']);
+                }
+                $facets['tags'] = $facetResults[$facetKey];
             } elseif ($sourceType === 'event_items') {
                 if (! $eventTypesLoaded) {
                     try {
@@ -297,6 +335,12 @@ final class BlockTreeResolver
         $body['status'] ??= $result->status;
 
         return $body;
+    }
+
+    /** @param list<mixed> $parts */
+    private function cacheKey(array $parts): string
+    {
+        return hash('sha256', serialize($parts));
     }
 
     /** @param array<string, mixed> $payload
