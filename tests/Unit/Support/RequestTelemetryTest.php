@@ -26,6 +26,8 @@ final class RequestTelemetryTest extends CIUnitTestCase
         RequestTelemetry::begin('request-123');
         RequestTelemetry::recordSource('admin.cms.workspace', 2.345, 'ok', 200);
         RequestTelemetry::recordSource('admin.event.lookup', 1.25, 'unavailable', 503);
+        RequestTelemetry::recordQuery();
+        RequestTelemetry::recordQuery();
         RequestTelemetry::recordCache('admin.cms.workspace.languages', 'hit');
         RequestTelemetry::recordCache('admin.cms.workspace.block-types', 'miss');
 
@@ -37,14 +39,17 @@ final class RequestTelemetryTest extends CIUnitTestCase
         $this->assertSame(['ok' => 1, 'unavailable' => 1], $sources['states']);
         $this->assertSame('admin.cms.workspace', $sources['events'][0]['source']);
         $this->assertSame(['hit' => 1, 'miss' => 1, 'bypass' => 0, 'stale' => 0], RequestTelemetry::cacheSummary());
+        $this->assertSame(2, RequestTelemetry::queryCount());
     }
 
     public function testRecordsNothingBeforeRequestBegins(): void
     {
         RequestTelemetry::recordSource('ignored', 1.0, 'ok', 200);
         RequestTelemetry::recordCache('ignored', 'hit');
+        RequestTelemetry::recordQuery();
 
         $this->assertSame(0, RequestTelemetry::sourceSummary()['count']);
         $this->assertSame(0, RequestTelemetry::cacheSummary()['hit']);
+        $this->assertSame(0, RequestTelemetry::queryCount());
     }
 }

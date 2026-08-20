@@ -37,6 +37,7 @@ final class RequestTelemetryFilter implements FilterInterface
             'duration_ms' => round(RequestTelemetry::elapsedMilliseconds(), 2),
             'status' => $status,
             'response_bytes' => strlen((string) $response->getBody()),
+            'db_query_count' => RequestTelemetry::queryCount(),
             'source_count' => $sources['count'],
             'source_duration_ms' => $sources['duration_ms'],
             'source_states' => $sources['states'],

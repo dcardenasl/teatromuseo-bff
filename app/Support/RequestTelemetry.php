@@ -16,6 +16,7 @@ final class RequestTelemetry
 
     private static ?string $requestId = null;
     private static ?float $startedAt = null;
+    private static int $queryCount = 0;
 
     /** @var list<array{source:string,duration_ms:float,state:string,status:int|null}> */
     private static array $sources = [];
@@ -33,6 +34,7 @@ final class RequestTelemetry
         self::$requestId = $requestId !== '' ? $requestId : null;
         self::$startedAt = microtime(true);
         self::$sources = [];
+        self::$queryCount = 0;
         self::$cacheStates = [
             'hit' => 0,
             'miss' => 0,
@@ -46,6 +48,7 @@ final class RequestTelemetry
         self::$requestId = null;
         self::$startedAt = null;
         self::$sources = [];
+        self::$queryCount = 0;
         self::$cacheStates = [
             'hit' => 0,
             'miss' => 0,
@@ -80,6 +83,18 @@ final class RequestTelemetry
             'state' => self::safeLabel($state),
             'status' => $status,
         ];
+    }
+
+    public static function recordQuery(): void
+    {
+        if (self::$startedAt !== null) {
+            self::$queryCount++;
+        }
+    }
+
+    public static function queryCount(): int
+    {
+        return self::$queryCount;
     }
 
     /** @param 'hit'|'miss'|'bypass'|'stale' $state */

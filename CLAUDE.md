@@ -145,6 +145,10 @@ sections into the response envelope. A separate query or PHP-side computation
 requires an explicit documented justification, a hard bound and coverage that
 guards its performance characteristics.
 
+The global `bff_request` telemetry record includes `db_query_count` for the
+direct public-read routes. Use that field when validating a page composition;
+it makes accidental per-block query fan-out observable in the hosting logs.
+
 `BaseProxyController::aggregate()` is currently sequential by design. The
 existing canonical `/me/dashboard` aggregator has one upstream call, so
 adding concurrency would add complexity without a current benefit. The real
