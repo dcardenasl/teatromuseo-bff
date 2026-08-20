@@ -92,4 +92,34 @@ final class PublicReadValidationTest extends ApiTestCase
         $this->assertSame(['unknown'], $body['errors']['fields']);
         $this->assertArrayHasKey('allowed', $body['errors']);
     }
+
+    /**
+     * TOTEM-BFF-19: the listing endpoint's allowed `fields` set was widened
+     * to include detail-only columns (`DETAIL_FIELDS` is a strict superset
+     * of `LIST_FIELDS`) so a bounded, single-call bulk consumer can request
+     * the richer projection for an entire category at once, instead of one
+     * call per item. `gallery_images`/`contenido` are detail-only fields —
+     * asking for them here must no longer be a validation error.
+     */
+    public function testListingAcceptsDetailOnlyFieldsForBulkConsumers(): void
+    {
+        $result = $this->get('/api/v1/public-read/es/collection-items?fields=id,name,gallery_images,contenido');
+
+        $result->assertStatus(200);
+        $body = $this->getResponseJson($result);
+        $this->assertTrue($body['ok']);
+    }
+
+    /** The default projection (no `fields` param) must stay exactly LIST_FIELDS — existing callers (Web) see no behavior change. */
+    public function testListingDefaultFieldsAreUnchangedWhenNoFieldsParamIsGiven(): void
+    {
+        $result = $this->get('/api/v1/public-read/es/collection-items');
+
+        $result->assertStatus(200);
+        $body = $this->getResponseJson($result);
+        $this->assertSame(
+            ['id', 'name', 'category_id', 'inventory_code', 'status', 'summary', 'cover_file_id', 'cover_image', 'slug', 'localized', 'category', 'created_at', 'updated_at'],
+            $body['meta']['fields'],
+        );
+    }
 }

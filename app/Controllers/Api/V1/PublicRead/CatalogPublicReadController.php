@@ -37,7 +37,13 @@ final class CatalogPublicReadController extends PublicReadSupport
                 $this->query(['locale' => $locale]),
             );
 
-            return $this->result(Services::publicReadCatalog()->index($request, $this->fields(self::LIST_FIELDS, self::LIST_FIELDS)));
+            // Allowed fields are DETAIL_FIELDS (a strict superset of LIST_FIELDS)
+            // so a bounded, single-call bulk consumer — the totem's cache
+            // warm-up, TOTEM-BFF-19 — can request the richer projection for an
+            // entire category in one call instead of one call per item. The
+            // default stays LIST_FIELDS, so existing callers (Web) see no
+            // behavior change unless they explicitly opt into more fields.
+            return $this->result(Services::publicReadCatalog()->index($request, $this->fields(self::DETAIL_FIELDS, self::LIST_FIELDS)));
         } catch (Throwable $exception) {
             return $this->failure($locale, $exception);
         }
