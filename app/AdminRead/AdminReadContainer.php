@@ -19,8 +19,10 @@ use App\AdminRead\Event\EventDashboardSource;
 use App\AdminRead\Files\AdminFileUsageSource;
 use App\AdminRead\Hub\AdminIamRoleWorkspaceSource;
 use App\AdminRead\Hub\AdminMetricsWorkspaceSource;
+use App\Support\ReadOnlyDatabaseGuard;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
+use LogicException;
 
 /** Construction seam for authenticated, direct dashboard projections. */
 final class AdminReadContainer
@@ -32,8 +34,25 @@ final class AdminReadContainer
             throw new \InvalidArgumentException('An admin-read database group is required.');
         }
 
+        $databaseConfig = config(Database::class);
+        $connectionConfig = [];
+        if (property_exists($databaseConfig, $group) && is_array($databaseConfig->{$group})) {
+            /** @var array<string, mixed> $connectionConfig */
+            $connectionConfig = $databaseConfig->{$group};
+        }
+
+        ReadOnlyDatabaseGuard::assertConfigured(
+            $group,
+            $connectionConfig,
+            defined('ENVIRONMENT') ? ENVIRONMENT : 'production',
+        );
+
         /** @var BaseConnection<mixed, mixed> $connection */
         $connection = Database::connect($group);
+
+        if (! $connection instanceof BaseConnection) {
+            throw new LogicException("AdminRead database group '{$group}' did not return a database connection.");
+        }
 
         return $connection;
     }

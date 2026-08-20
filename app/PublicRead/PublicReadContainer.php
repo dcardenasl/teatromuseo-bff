@@ -24,7 +24,10 @@ use App\PublicRead\Cms\TranslationResolver;
 use App\PublicRead\Event\PublicReadEventReader;
 use App\PublicRead\Support\DirectDbFileMetaResolver;
 use App\PublicRead\Support\MediaHydrator;
+use App\Support\ReadOnlyDatabaseGuard;
 use CodeIgniter\Database\BaseConnection;
+use Config\Database;
+use LogicException;
 
 /** Construction seam for all direct public-read dependencies. */
 final class PublicReadContainer
@@ -36,8 +39,25 @@ final class PublicReadContainer
             throw new \InvalidArgumentException('A public-read database group is required.');
         }
 
+        $databaseConfig = config(Database::class);
+        $connectionConfig = [];
+        if (property_exists($databaseConfig, $group) && is_array($databaseConfig->{$group})) {
+            /** @var array<string, mixed> $connectionConfig */
+            $connectionConfig = $databaseConfig->{$group};
+        }
+
+        ReadOnlyDatabaseGuard::assertConfigured(
+            $group,
+            $connectionConfig,
+            defined('ENVIRONMENT') ? ENVIRONMENT : 'production',
+        );
+
         /** @var BaseConnection<mixed, mixed> $connection */
-        $connection = \Config\Database::connect($group);
+        $connection = Database::connect($group);
+
+        if (! $connection instanceof BaseConnection) {
+            throw new LogicException("Read database group '{$group}' did not return a database connection.");
+        }
 
         return $connection;
     }
