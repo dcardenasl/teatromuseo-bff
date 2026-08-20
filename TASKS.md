@@ -41,6 +41,22 @@
 
 ## ✅ Completadas
 
+- [x] **BFF-TOTEM-03 — Listado de catálogo acepta campos de detalle en bloque.**
+  Cerrada 2026-08-19. `CatalogPublicReadController::index()` ahora permite
+  `DETAIL_FIELDS` vía `?fields=` (antes restringido a `LIST_FIELDS`) — el
+  Tótem lo usa (`TOTEM-BFF-19` en `teatromuseo-totem-ci4/TASKS.md`) para
+  pedir, en una sola llamada por categoría, todo lo que la ficha de detalle
+  de cada pieza necesita, y así calentar el caché completo del catálogo con
+  un número de llamadas acotado (no una por pieza) sin importar cuántas
+  piezas tenga el museo. El proyecto por defecto (sin `fields=`) sigue
+  siendo `LIST_FIELDS` — cero cambio de comportamiento para Web u otro
+  llamador que no pida más campos explícitamente. Tests nuevos en
+  `PublicReadValidationTest.php`. `composer analyse` y `tests/Unit` (213
+  tests) verdes; los tests `Feature/PublicRead` nuevos no se pudieron
+  ejecutar en esta sesión por una caída de MySQL/Docker ajena a este
+  cambio (puerto 3306 abierto pero el handshake nunca completa) — pendiente
+  de re-verificar cuando el entorno se recupere.
+
 - [x] **BFF-TOTEM-02 — `last_occurrence_at` en el listado público de eventos.**
   Cerrada 2026-08-19. `EventPublicReadController::LIST_FIELDS` y
   `PublicReadEventReader::index()`/`hydrate()` exponen `last_occurrence_at`

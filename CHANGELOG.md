@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Catalog listing accepts detail-field bulk requests (TOTEM-BFF-19)** — `CatalogPublicReadController::index()`
+  now allows `DETAIL_FIELDS` via `?fields=` (previously restricted to `LIST_FIELDS`), so a bounded,
+  single-consumer bulk reader (the totem's cache warm-up) can request the full detail projection
+  for an entire category in one call instead of one call per item. The default projection with no
+  `fields` param is unchanged — existing callers (Web) see no behavior change.
 - **Trusted multi-caller `X-App-Key` + kiosk catalog curation** — `WebAppKeyRequiredFilter`
   now accepts a dedicated `TOTEM_BFF_API_KEY` alongside the existing web key, records the
   resolved caller (`web`/`totem`) in `App\Support\PublicReadCallerContext`, and the public-read
