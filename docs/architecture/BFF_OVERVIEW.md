@@ -168,11 +168,18 @@ not needed for a simple JSON ping. `HealthController` extends the lightweight
 `CodeIgniter\Controller` for this reason, following the same justified exception
 pattern used by the hub's `HealthController`.
 
-### Why probe the hub in /ready and /health instead of a database?
+### Why is `/ready` cheap while `/health` is detailed?
 
-The BFF has no database. Its readiness depends entirely on whether it can reach
-its primary upstream (the hub). A tight-timeout `GET {hubUrl}/ping` is the
-correct readiness probe for a stateless gateway.
+The BFF's readiness depends on whether it can reach its primary upstream (the
+hub). A tight-timeout `GET {hubUrl}/ping` is the correct operational probe for
+a stateless gateway, so `/ready` performs only that one upstream check.
+
+`/health` is an explicit diagnostic endpoint, not a high-frequency monitor. It
+also checks the four named read-only database connections plus local disk and
+writable-folder state. Polling it every few seconds would consume PHP
+processes and database connections on the production shared host; cPanel and
+external monitors must use `/ping` or `/live`, and use `/ready` only when the
+single Hub dependency must be verified.
 
 ---
 

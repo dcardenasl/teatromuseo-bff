@@ -20,9 +20,9 @@ use Throwable;
  * Infrastructure endpoint — kept thin (no `ApiController` overhead) because it
  * is called every 5–10s by orchestrators (Kubernetes, Docker Swarm).
  *
- * Readiness checks both the upstream Hub and the four explicit public-read
- * database groups. The database probe is SELECT-only and never exposes
- * connection details in the response.
+ * Readiness checks only the upstream Hub. The detailed `/health` endpoint is
+ * intentionally separate because probing four databases on every readiness
+ * request would consume scarce hosting processes and database connections.
  */
 class HealthController extends Controller
 {
@@ -67,19 +67,20 @@ class HealthController extends Controller
     }
 
     /**
-     * GET /ready — ready to serve traffic iff Hub and read databases respond.
+     * GET /ready — ready to serve traffic iff the Hub responds.
+     *
+     * This is the cheap operational probe. Use `/health` only for an explicit
+     * detailed diagnostic because it performs the four SELECT-only probes.
      */
     public function ready(): ResponseInterface
     {
         $hubCheck = $this->probeHub();
-        $databaseChecks = $this->readDatabaseHealth->check();
-        $isReady  = $hubCheck['status'] === 'healthy' && $this->readDatabaseHealth->isHealthy($databaseChecks);
+        $isReady  = $hubCheck['status'] === 'healthy';
 
         return $this->response->setJSON([
             'status'    => $isReady ? 'ready' : 'not_ready',
             'timestamp' => date('Y-m-d H:i:s'),
             'hub'       => $hubCheck,
-            'databases' => $databaseChecks,
         ])->setStatusCode($isReady ? 200 : 503);
     }
 

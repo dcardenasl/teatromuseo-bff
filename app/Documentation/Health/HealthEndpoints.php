@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
     path: '/health',
     tags: ['System'],
     summary: 'Overall health check',
-    description: 'Aggregates the hub probe with local disk/writable checks. Returns 503 when any check is unhealthy.',
+    description: 'Detailed diagnostic only: aggregates the hub probe, four SELECT-only read-database probes, and local disk/writable checks. Do not poll this endpoint as a liveness or readiness monitor on low-capacity hosting.',
     responses: [
         new OA\Response(
             response: 200,
@@ -19,9 +19,10 @@ use OpenApi\Attributes as OA;
                 properties: [
                     new OA\Property(property: 'status', type: 'string', example: 'healthy'),
                     new OA\Property(property: 'timestamp', type: 'string'),
-                    new OA\Property(property: 'checks', type: 'object', properties: [
-                        new OA\Property(property: 'hub', type: 'object'),
-                        new OA\Property(property: 'disk', type: 'object'),
+                        new OA\Property(property: 'checks', type: 'object', properties: [
+                            new OA\Property(property: 'hub', type: 'object'),
+                            new OA\Property(property: 'databases', type: 'object'),
+                            new OA\Property(property: 'disk', type: 'object'),
                         new OA\Property(property: 'writable', type: 'object'),
                     ]),
                 ],

@@ -63,6 +63,7 @@ class HealthControllerTest extends ApiTestCase
         $json = json_decode((string) $result->response()->getBody(), true);
         $this->assertSame('ready', $json['status']);
         $this->assertSame('healthy', $json['hub']['status']);
+        $this->assertArrayNotHasKey('databases', $json);
     }
 
     public function testReadyReturns503WhenHubIsUnreachable(): void
@@ -75,6 +76,7 @@ class HealthControllerTest extends ApiTestCase
         $json = json_decode((string) $result->response()->getBody(), true);
         $this->assertSame('not_ready', $json['status']);
         $this->assertSame('unhealthy', $json['hub']['status']);
+        $this->assertArrayNotHasKey('databases', $json);
     }
 
     public function testReadyReturns503WhenHubResponds5xx(): void
