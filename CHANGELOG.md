@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`me/admin-cms/categories/{bootstrap,{id}/bootstrap}`, `me/admin-catalog/collection-items/list-bootstrap`,
+  `me/admin-catalog/techniques/{workspace,{id}/workspace}`, `me/admin-event/events/list-bootstrap`** —
+  four new `effectivepermissionsauth`-gated Admin bootstrap/list/workspace projections, each backed
+  by a bounded SELECT-only `AdminRead` source over the relevant domain's readonly connection.
+- **`GET /me/admin-dashboard` reports per-source `duration_ms` and hosting `diagnostics`** —
+  `ReadOnlyQuery::timedSql()` times the existing dashboard query instead of issuing a second
+  probe, and `Monitoring\RuntimeDiagnostics` adds cheap local disk/writable-path checks, so
+  degraded sources are distinguishable from a slow host without extra requests.
+- **`ReadOnlyDatabaseGuard`** — `AdminReadContainer`/`PublicReadContainer` now fail fast in
+  production if a `*_readonly` database group is missing required connection settings, instead
+  of silently falling through to the SQLite compatibility stub.
 - **Catalog listing accepts detail-field bulk requests (TOTEM-BFF-19)** — `CatalogPublicReadController::index()`
   now allows `DETAIL_FIELDS` via `?fields=` (previously restricted to `LIST_FIELDS`), so a bounded,
   single-consumer bulk reader (the totem's cache warm-up) can request the full detail projection
