@@ -502,6 +502,7 @@ def prune_remote_files(
     remote_dir: str,
     include_bootstrap_files: bool,
     yes: bool,
+    dry_run: bool = False,
 ) -> int:
     local_paths = {
         relative_path
@@ -516,6 +517,10 @@ def prune_remote_files(
     print(f"Remote prune found {len(obsolete)} obsolete files:")
     for path in obsolete:
         print(f"  [obsolete] {path}")
+
+    if dry_run:
+        print("Dry run: no remote files were deleted.")
+        return 0
 
     if not yes:
         if not sys.stdin.isatty():
@@ -610,8 +615,28 @@ def main() -> int:
             print(f"Found {len(modified_files)} new or modified files:")
             for relative_path, _ in sorted(modified_files):
                 print(f"  [modified] {relative_path}")
-        if args.prune and args.dry_run:
-            print("Remote prune requires a live connection; no remote files were inspected.")
+
+        if args.dry_run and args.prune:
+            # Listing obsolete remote files requires a live, read-only FTP
+            # session (MLSD). No STOR/DELE call is ever made in this branch.
+            ftp: FTP | FTP_TLS | None = None
+            try:
+                ftp = connect_ftp(config)
+                prune_status = prune_remote_files(
+                    ftp,
+                    remote_dir,
+                    include_bootstrap_files=args.bootstrap,
+                    yes=args.yes,
+                    dry_run=True,
+                )
+            finally:
+                if ftp is not None:
+                    try:
+                        ftp.quit()
+                    except Exception:
+                        pass
+            print("Dry run complete. No files were uploaded or deleted.")
+            return prune_status
 
         if args.dry_run:
             print("Dry run complete. No files were uploaded or deleted.")
