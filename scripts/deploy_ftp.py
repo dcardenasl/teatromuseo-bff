@@ -485,10 +485,15 @@ def list_remote_files(
             part in BLACKLIST_DIRS for part in Path(relative_path).parts[:-1]
         ):
             continue
-        if facts.get("type") == "dir":
+        entry_type = facts.get("type", "")
+        if entry_type == "dir":
             result.extend(list_remote_files(ftp, remote_dir, relative_path))
-        else:
+        elif entry_type == "file":
             result.append(relative_path)
+        # Anything else (symlinks report as "OS.unix=slink:", plus any other
+        # non-regular entry) is server infrastructure, not a deployed
+        # artifact — never propose it for deletion. A stale public/uploads
+        # symlink to the writable storage directory is exactly this case.
     return result
 
 
