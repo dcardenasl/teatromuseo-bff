@@ -94,6 +94,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bootstraps drop the CMS Domain HTTP fallback and use only their direct SQL
   projections; a missing `cms_readonly` connection now fails closed instead of
   falling back to the old multi-request HTTP path.
+- **`PageResolver`/`PublicReadPageReader`** — resolving a page now batches every
+  equivalent localized path candidate (slug aliases) into one set-based `showAny()`
+  read instead of one sequential `show()` call per candidate. Response shape is
+  unchanged.
+- **`PublicReadFormReader`** — form field translations are now resolved with one
+  bounded `whereIn` query instead of up to three queries per field. Response
+  shape is unchanged.
+- **`BlockInstanceSerializer`** — block instance data/config/schema are now
+  decoded once per instance instead of on every pass over the instance list, and
+  the block instance projection selects only the columns it uses. Response shape
+  is unchanged.
 
 ### Fixed
 
