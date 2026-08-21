@@ -63,7 +63,7 @@ class BlockInstanceSerializer
         $db = $this->db;
 
         $query = $db->table('cms_block_instances i')
-            ->select('i.*, b.block_key, b.name as block_type_name, b.schema_definition')
+            ->select('i.id, i.owner_id, i.parent_instance_id, i.sort_order, i.column_index, i.block_config, b.block_key, b.schema_definition')
             ->join('cms_content_blocks b', 'b.id = i.block_id')
             ->where('i.owner_type', $ownerType)
             ->whereIn('i.owner_id', $ownerIds)
@@ -81,14 +81,33 @@ class BlockInstanceSerializer
 
         $translationsMap = $this->batchResolveBlockTranslations($instanceIds, $langCode, $db);
 
+        /** @var array<int, array<string, mixed>> $blockDataByInstanceId */
+        $blockDataByInstanceId = [];
+        /** @var array<int, array<string, mixed>> $blockConfigByInstanceId */
+        $blockConfigByInstanceId = [];
+        /** @var array<int, array<string, mixed>> $schemaByInstanceId */
+        $schemaByInstanceId = [];
+        foreach ($instances as $instance) {
+            $instanceId = (int) $instance['id'];
+            $translationData = $translationsMap[$instanceId] ?? [];
+            $rawData = $translationData['block_data'] ?? null;
+            $decodedData = is_string($rawData) ? (json_decode($rawData, true) ?? []) : (array) $rawData;
+            $blockDataByInstanceId[$instanceId] = is_array($decodedData) ? $decodedData : [];
+
+            $rawConfig = $instance['block_config'] ?? null;
+            $decodedConfig = is_string($rawConfig) ? (json_decode($rawConfig, true) ?? []) : (array) $rawConfig;
+            $blockConfigByInstanceId[$instanceId] = is_array($decodedConfig) ? $decodedConfig : [];
+
+            $schemaByInstanceId[$instanceId] = $this->parseSchemaDefinition((string) ($instance['schema_definition'] ?? ''));
+        }
+
         $referenceMap = [];
         if ($this->entryReferenceResolver !== null) {
             $references = [];
             foreach ($instances as $instance) {
-                $translationData = $translationsMap[(int) $instance['id']] ?? [];
-                $rawData = $translationData['block_data'] ?? null;
-                $blockData = is_string($rawData) ? (json_decode($rawData, true) ?? []) : (array) $rawData;
-                $schemaDefinition = $this->parseSchemaDefinition((string) ($instance['schema_definition'] ?? ''));
+                $instanceId = (int) $instance['id'];
+                $blockData = $blockDataByInstanceId[$instanceId] ?? [];
+                $schemaDefinition = $schemaByInstanceId[$instanceId] ?? [];
                 $references = array_merge(
                     $references,
                     $this->entryReferenceResolver->collectReferences($blockData, (array) ($schemaDefinition['fields'] ?? []))
@@ -100,22 +119,15 @@ class BlockInstanceSerializer
         // Collect all file IDs in a single pre-pass via schema field declarations
         $allFileIds = [];
         foreach ($instances as $instance) {
-            $translationData = $translationsMap[(int) $instance['id']] ?? [];
-            $rawData         = $translationData['block_data'] ?? null;
-            $blockData       = is_string($rawData) ? (json_decode($rawData, true) ?? []) : (array) $rawData;
-
-            $schemaDefinition = $this->parseSchemaDefinition((string) ($instance['schema_definition'] ?? ''));
+            $instanceId = (int) $instance['id'];
+            $blockData = $blockDataByInstanceId[$instanceId] ?? [];
+            $schemaDefinition = $schemaByInstanceId[$instanceId] ?? [];
             $schemaFields = (array) ($schemaDefinition['fields'] ?? []);
             $schemaConfigFields = (array) ($schemaDefinition['config_fields'] ?? []);
 
             $allFileIds = array_merge($allFileIds, $this->fileUrlResolver->collectBlockFileIds($blockData, $schemaFields));
 
-            $blockConfig = [];
-            if (!empty($instance['block_config'])) {
-                $blockConfig = is_string($instance['block_config'])
-                    ? (json_decode($instance['block_config'], true) ?? [])
-                    : (array) $instance['block_config'];
-            }
+            $blockConfig = $blockConfigByInstanceId[$instanceId] ?? [];
             $allFileIds = array_merge($allFileIds, $this->fileUrlResolver->collectSchemaFileIds($blockConfig, $schemaConfigFields));
         }
 
@@ -132,18 +144,9 @@ class BlockInstanceSerializer
             $instanceId  = (int) $instance['id'];
             $translation = $translationsMap[$instanceId] ?? [];
 
-            $rawBlockData = $translation['block_data'] ?? null;
-            $blockData    = is_string($rawBlockData)
-                ? (json_decode($rawBlockData, true) ?? [])
-                : (array) $rawBlockData;
-            $blockConfig = [];
-            if (!empty($instance['block_config'])) {
-                $blockConfig = is_string($instance['block_config'])
-                    ? (json_decode($instance['block_config'], true) ?? [])
-                    : (array) $instance['block_config'];
-            }
-
-            $schemaDefinition = $this->parseSchemaDefinition((string) ($instance['schema_definition'] ?? ''));
+            $blockData = $blockDataByInstanceId[$instanceId] ?? [];
+            $blockConfig = $blockConfigByInstanceId[$instanceId] ?? [];
+            $schemaDefinition = $schemaByInstanceId[$instanceId] ?? [];
             $schemaFields = (array) ($schemaDefinition['fields'] ?? []);
             $schemaConfigFields = (array) ($schemaDefinition['config_fields'] ?? []);
             $presentation = is_array($schemaDefinition['presentation'] ?? null)
