@@ -44,6 +44,30 @@ pendiente de triage propio en este repo. No se abre como tarea numerada
 todavía porque no hay decisión de diseño tomada (¿`ETag` HTTP estándar vs.
 un parámetro `?since_revision=` explícito en el envelope?).
 
+### Autorización editorial por recurso en CMS (2026-08-20) — ver `../docs/plan/2026-08-20-plan-autorizacion-editorial-por-recurso-cms-v2.md`
+
+Depende de `CMS-ACCESS-04..06` (`teatromuseo-cms-domain`) verificados antes de
+empezar. **No es un seguimiento ligero de Fase 5** — envergadura comparable a
+`CMS-ACCESS-05` en cms-domain, no un cambio de firma menor.
+
+- [ ] **CMS-ACCESS-07 — `EXISTS` por sección en AdminRead CMS + alineación
+  cruzada.** `CmsWorkspaceProjectionQuery`/`AdminCmsWorkspaceSource`/
+  `AdminCmsBootstrapSource` hoy filtran todo-o-nada por sección según permiso
+  global; reescribir con predicados `EXISTS` por fila para usuarios scoped en
+  las ~6 subqueries compuestas (`pages`, `collections`, `entries`, `forms`,
+  `categories`, `tags`). Propagar `user_id` (hoy ausente en estas fuentes).
+  Decisión de duplicar en vez de proxiar al CMS Domain ya documentada en
+  [`docs/adr/002-cms-scoped-access-duplicated-not-proxied.md`](docs/adr/002-cms-scoped-access-duplicated-not-proxied.md).
+  **Salvaguarda obligatoria:** test de alineación cruzada con
+  `CmsResourceAccessPolicy` del CMS Domain — a diferencia de drift de forma de
+  un modelo de lectura (tolerado, ver ADR-010), drift de un predicado de
+  autorización es un riesgo de seguridad. Caché: añadir
+  `cms_access_policy_revision` como componente extra de la clave existente
+  (`context + hash(permisos)`, TTL=30s) solo para requests de usuario scoped —
+  para capacidad global, clave y TTL no cambian.
+  Justifica la reapertura de código marcado "CMS bootstrap solo se reabre con
+  evidencia runtime nueva" (ver nota debajo): este plan es la evidencia.
+
 ### Lecturas compuestas del Admin vía BFF (2026-08-16) — ver `../docs/plan/2026-08-16-plan-admin-lecturas-compuestas-via-bff.md`
 
 El seam `AdminRead` ya cubre dashboard, analytics, traducciones, usos de
@@ -51,7 +75,8 @@ archivos, lookups de Event y bootstraps/workspaces CMS (todas las Features
 1-5 cerradas — ver `TASKS_ARCHIVE.md`). Regla vigente para trabajo futuro:
 las nuevas pantallas del Admin deben reutilizar esos contratos o crear un
 módulo profundo dedicado; no se agregan ramas genéricas a un bootstrap
-existente. CMS bootstrap solo se reabre con evidencia runtime nueva. Fuente
+existente. CMS bootstrap solo se reabre con evidencia runtime nueva (la
+reapertura de `CMS-ACCESS-07` arriba es exactamente ese caso). Fuente
 arquitectónica:
 [ADR-010](docs/adr/010-hosting-constrained-bff-read-architecture.md).
 
