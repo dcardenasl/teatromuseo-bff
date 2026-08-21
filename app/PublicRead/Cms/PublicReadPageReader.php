@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\PublicRead\Cms;
 
+use App\PublicRead\Page\PageCandidateReaderInterface;
 use App\PublicRead\Page\PageReaderInterface;
 use App\PublicRead\Support\PublicReadEnvelope;
 use CodeIgniter\Database\BaseBuilder;
@@ -11,7 +12,7 @@ use CodeIgniter\Database\BaseConnection;
 use dcardenasl\Ci4ApiCore\Support\ApiResult;
 
 /** Set-based CMS page reader with batch block serialization. */
-final class PublicReadPageReader implements PageReaderInterface
+final class PublicReadPageReader implements PageReaderInterface, PageCandidateReaderInterface
 {
     private const FALLBACK_LOCALE = 'es';
 
@@ -77,14 +78,40 @@ final class PublicReadPageReader implements PageReaderInterface
     /** @param list<string> $fields */
     public function show(string $locale, string $path, array $fields, bool $preview = false): ApiResult
     {
-        $normalized = trim($path, '/');
-        if ($normalized === '') {
-            $normalized = 'home';
+        return $this->showAny($locale, [$path], $fields, $preview);
+    }
+
+    /**
+     * Resolve equivalent localized paths with one set-based candidate read.
+     *
+     * @param list<string> $paths
+     * @param list<string> $fields
+     */
+    public function showAny(string $locale, array $paths, array $fields, bool $preview = false): ApiResult
+    {
+        $normalizedPaths = [];
+        foreach ($paths as $path) {
+            $normalized = trim($path, '/');
+            $normalized = $normalized === '' ? 'home' : $normalized;
+            if (! in_array($normalized, $normalizedPaths, true)) {
+                $normalizedPaths[] = $normalized;
+            }
+        }
+
+        if ($normalizedPaths === []) {
+            return $this->notFound($locale);
         }
 
         [$languages, $codeById, $defaultLocale] = $this->loadPublicLanguages();
         $languageIds = array_keys($codeById);
-        $segments = array_values(array_filter(explode('/', $normalized), static fn (string $segment): bool => $segment !== ''));
+        $segments = [];
+        foreach ($normalizedPaths as $path) {
+            foreach (explode('/', $path) as $segment) {
+                if ($segment !== '' && ! in_array($segment, $segments, true)) {
+                    $segments[] = $segment;
+                }
+            }
+        }
         if ($languageIds === [] || $segments === []) {
             return $this->notFound($locale);
         }
@@ -96,7 +123,7 @@ final class PublicReadPageReader implements PageReaderInterface
             ->whereIn('pt.language_id', $languageIds)
             ->groupStart()
                 ->whereIn('pt.slug', $segments)
-                ->orWhere('pt.slug', $normalized)
+                ->orWhereIn('pt.slug', $normalizedPaths)
             ->groupEnd();
         if (! $preview) {
             $candidateBuilder->where('p.status', 'published');
@@ -133,10 +160,12 @@ final class PublicReadPageReader implements PageReaderInterface
 
         $pathMap = $this->buildPathMap(array_values($pages), $translations, $languages, $locale, $defaultLocale);
         $pageId = null;
-        foreach ($pathMap as $candidateId => $pathData) {
-            if ($pathData['path'] === $normalized) {
-                $pageId = (int) $candidateId;
-                break;
+        foreach ($normalizedPaths as $candidatePath) {
+            foreach ($pathMap as $candidateId => $pathData) {
+                if ($pathData['path'] === $candidatePath) {
+                    $pageId = (int) $candidateId;
+                    break 2;
+                }
             }
         }
         if ($pageId === null || !isset($pages[$pageId])) {
@@ -194,12 +223,19 @@ final class PublicReadPageReader implements PageReaderInterface
             $payload['blocks'] = $this->blockSerializer->forContent('page', (int) $pageId, $locale);
         }
 
+        $query = count($normalizedPaths) === 1
+            ? ['path' => $normalizedPaths[0], 'preview' => $preview]
+            : ['paths' => $normalizedPaths, 'preview' => $preview];
+
         return PublicReadEnvelope::success(
             locale: $locale,
             data: $this->filterFields($payload, $fields),
             sourceRevision: $this->revision([$page]),
             domain: 'cms',
-            meta: ['fields' => $fields, 'query' => ['path' => $normalized, 'preview' => $preview]],
+            meta: [
+                'fields' => $fields,
+                'query' => $query,
+            ],
         );
     }
 

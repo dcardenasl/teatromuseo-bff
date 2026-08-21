@@ -48,16 +48,13 @@ final class PageResolver
             return $this->redirectResult($redirect['path'], $redirect['status']);
         }
 
-        $page = $this->pageFor($locale, $path, $preview);
+        $pageCandidates = array_values(array_unique([
+            $path,
+            ...PublicPagePaths::aliasesFor($path, $locale),
+        ]));
+        $page = $this->pageForCandidates($locale, $pageCandidates, $preview);
         if ($page !== null) {
             return $this->pageResult($page);
-        }
-
-        foreach (PublicPagePaths::aliasesFor($path, $locale) as $alias) {
-            $page = $this->pageFor($locale, $alias, $preview);
-            if ($page !== null) {
-                return $this->pageResult($page);
-            }
         }
 
         $domainDetail = $this->domainDetailFor($locale, $path);
@@ -85,6 +82,45 @@ final class PageResolver
         }
 
         return ['outcome' => 'not_found', 'redirect' => null, 'page' => null, 'context' => []];
+    }
+
+    /**
+     * Use the set-based reader when the concrete CMS adapter supports it.
+     * Homepage resolution deliberately keeps the legacy order because its
+     * `page_type=home` fallback has priority over alias slugs.
+     *
+     * @param list<string> $paths
+     * @return array<string, mixed>|null
+     */
+    private function pageForCandidates(string $locale, array $paths, bool $preview): ?array
+    {
+        if ($this->pages instanceof PageCandidateReaderInterface
+            && ! $this->containsHomepageCandidate($paths, $locale)) {
+            $result = $this->pages->showAny($locale, $paths, [], $preview);
+            $data = $result->body['data'] ?? null;
+            if (is_array($data) && ($result->body['ok'] ?? false) === true) {
+                return $data;
+            }
+
+            return null;
+        }
+
+        foreach ($paths as $path) {
+            $page = $this->pageFor($locale, $path, $preview);
+            if ($page !== null) {
+                return $page;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<string> $paths */
+    private function containsHomepageCandidate(array $paths, string $locale): bool
+    {
+        $homepage = PublicPagePaths::homepageSegment($locale);
+
+        return in_array($homepage, $paths, true) || in_array('home', $paths, true);
     }
 
     /** @return array{path: string, status: int}|null */

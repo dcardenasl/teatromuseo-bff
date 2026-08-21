@@ -8,6 +8,7 @@ use App\PublicRead\Page\CatalogItemReaderInterface;
 use App\PublicRead\Page\CollectionReaderInterface;
 use App\PublicRead\Page\EntryReaderInterface;
 use App\PublicRead\Page\EventReaderInterface;
+use App\PublicRead\Page\PageCandidateReaderInterface;
 use App\PublicRead\Page\PageReaderInterface;
 use App\PublicRead\Page\PageResolver;
 use App\PublicRead\Page\PublicPagePaths;
@@ -97,6 +98,53 @@ final class PublicPagePathsTest extends CIUnitTestCase
             ['en', 'cartelera', [], false],
             ['en', 'programming', [], false],
         ], $paths);
+    }
+
+    public function testBatchesEquivalentCmsPathsIntoOneReadWhenTheReaderSupportsIt(): void
+    {
+        $redirects = $this->createMock(RedirectReaderInterface::class);
+        $redirects->method('resolve')->willThrowException(new NotFoundException());
+        $pages = new class () implements PageReaderInterface, PageCandidateReaderInterface {
+            /** @var list<string> */
+            public array $candidates = [];
+
+            public function show(string $locale, string $path, array $fields, bool $preview = false): ApiResult
+            {
+                unset($locale, $path, $fields, $preview);
+                throw new \LogicException('The set-based reader should be used.');
+            }
+
+            public function showAny(string $locale, array $paths, array $fields, bool $preview = false): ApiResult
+            {
+                unset($locale, $fields, $preview);
+                $this->candidates = $paths;
+
+                return new ApiResult([
+                    'ok' => true,
+                    'data' => ['page_type' => 'events'],
+                ], 200);
+            }
+
+            public function byType(string $locale, string $type): ApiResult
+            {
+                unset($locale, $type);
+
+                return new ApiResult(['ok' => false, 'data' => null], 404);
+            }
+        };
+
+        $result = (new PageResolver($redirects, $pages))->resolve('en', 'cartelera');
+
+        self::assertSame('page', $result['outcome']);
+        self::assertSame([
+            'cartelera',
+            'programming',
+            'events',
+            'programme',
+            'eventos',
+            'programmation',
+            'programacao',
+        ], $pages->candidates);
     }
 
     public function testReturnsARedirectWithoutReadingThePage(): void
