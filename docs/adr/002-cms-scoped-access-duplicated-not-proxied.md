@@ -30,7 +30,11 @@ path to test and reason about, not a one-time cost.
 
 This is not a new kind of trade-off for this codebase: `AdminRead` and `PublicRead` already each own their
 own query/permission logic independently, by explicit design (see the "Cross-seam reuse" note in
-`CLAUDE.md` — file-URL resolution is deliberately shared, but query/permission logic deliberately is not).
+`CLAUDE.md` — file-URL resolution is deliberately shared, but query/permission logic deliberately is not),
+and the direct-read architecture both seams sit on is itself a deliberate response to a hosting-tier
+constraint, not an accident — see
+[ADR-010](010-hosting-constrained-bff-read-architecture.md), which formalizes the Entry Process ceiling
+that makes an extra HTTP hop per read a real cost here, not a style preference.
 
 ## Decision
 
