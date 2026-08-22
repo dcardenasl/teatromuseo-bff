@@ -116,6 +116,43 @@ vez por perfil. La evidencia separa dos efectos: el snapshot elimina la
 composición BFF/DB de la visita, mientras que el HTML response cache reduce el
 trabajo PHP repetido; ninguno elimina la cola de cinco workers en misses.
 
+### 2026-08-21/22 — matriz de capacidad y atribución en vivo
+
+Se ejecutó una matriz adicional con el perfil recomendado: snapshot estricto,
+HTML response cache precalentado, cron deshabilitado, seis rutas públicas y
+límites de `768 MiB`/`0,80` CPU. El arnés se corrigió para que la etapa
+intermedia nunca forzara accidentalmente más VUs que el máximo solicitado.
+
+| VUs máximos | p95 | p99 | Máximo | Errores |
+|---:|---:|---:|---:|---:|
+| 1 | 21,5 ms | 23,8 ms | 24,8 ms | 0% |
+| 5 | 22,0 ms | 30,3 ms | 32,4 ms | 0% |
+| 6 | 18,3 ms | 29,5 ms | 8,51 s | 0% |
+| 6, repetición | 24,3 ms | 38,9 ms | 8,24 s | 0% |
+| 8 | 18,5 ms | 14,46 s | 21,36 s | 0% |
+| 10 | 17,8 ms | 20,69 s | 27,11 s | 0% |
+| 10, repetición | 20,5 ms | 20,94 s | 23,93 s | 0% |
+
+La muestra en vivo de 10 VUs encontró exactamente cinco workers Apache/PHP
+activos más el proceso padre y registró `AH00161: server reached
+MaxRequestWorkers setting`. El host estaba aproximadamente en `65,8 MiB / 768
+MiB` y `1,71%` de CPU; MariaDB en `136,2 MiB / 256 MiB`, `0,18%` de CPU,
+una conexión cliente, máximo histórico de tres y cero consultas lentas.
+
+El access log registró alrededor de `6–26 ms` de servicio por ruta. Los
+outliers de `20–24 s` de k6 se repartieron entre varias URLs y no aparecieron
+como PHP lento en el access log; corresponden a espera antes de que Apache
+acepte la conexión cuando los cinco workers están ocupados. Con cron
+deshabilitado el fenómeno se repite, por lo que el cron no es el causante
+principal de este cuello.
+
+La capacidad operativa conservadora del perfil es de cinco sesiones activas que
+están esperando una respuesta PHP; seis es advertencia reproducible y ocho o
+más es saturación de experiencia aunque el servidor todavía responda 200. VU
+no equivale a usuario recurrente diario: esa métrica requiere analytics o
+access logs reales. La tabla completa y sus límites están en
+`docker/performance/results/k6-capacity-matrix-20260821.md`.
+
 ## Hallazgos
 
 1. La robustez funcional es buena: los gates de BFF y Web están verdes y la
@@ -159,6 +196,21 @@ trabajo PHP repetido; ninguno elimina la cola de cinco workers en misses.
     se aceptan silenciosamente como snapshots. Para habilitarlas después se
     requiere política por ruta, entradas finitas, warmup explícito,
     invalidación y revisión del presupuesto de almacenamiento.
+11. El primer deterioro reproducible aparece en seis sesiones activas. A ocho
+    VUs el p99 llega a `14,46 s` y a diez VUs supera `20 s`, aunque el error
+    rate permanece en 0%; por eso el rate de 5xx por sí solo no mide el colapso
+    de experiencia.
+12. El proceso específico que alcanza el límite es el pool prefork de
+    Apache/PHP (`MaxRequestWorkers=5`). No se encontró evidencia de que
+    MariaDB, una consulta lenta concreta o una sola ruta sea el cuello del
+    perfil snapshot+cache.
+13. Las rutas HTML observadas tienen servicio interno corto, pero la cola
+    compartida puede afectar a cualquier URL. La diferencia entre el access log
+    rápido y el p99 de k6 es evidencia de espera de aceptación, no de que el
+    p99 deba ignorarse.
+14. La matriz mide sesiones activas y no usuarios recurrentes. Para convertirla
+    en capacidad de negocio falta una distribución real de usuarios, pausas
+    entre páginas, assets, ráfagas y tráfico de APIs/formularios.
 
 ## Correcciones aplicadas
 
@@ -178,6 +230,9 @@ trabajo PHP repetido; ninguno elimina la cola de cinco workers en misses.
 
 - Resumen reproducible de la nueva corrida:
   `docker/performance/results/k6-comparison-20260821-summary.md`.
+- Matriz de capacidad por VUs, repetición de los puntos 6 y 10 y atribución del
+  cuello de botella:
+  `docker/performance/results/k6-capacity-matrix-20260821.md`.
 - Comparación final de los tres perfiles y decisión operativa:
   `docker/performance/results/k6-final-comparison-20260821.md`.
 - Comparación previa con datos importados:
