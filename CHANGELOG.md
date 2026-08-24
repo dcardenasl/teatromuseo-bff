@@ -117,3 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pages, entries and forms catalogs are only projected when the caller holds the
   matching `cms.*.read` permission — previously every auxiliary catalog was always
   returned regardless of the caller's actual read scope.
+- **`PublicReadNavigationReader`** — the public navigation seam now keys menus by
+  `menu_key` instead of matching a fixed `location` whitelist (`header`/`main`/
+  `footer`/`legal`); an editor-defined `location` value no longer drops the menu
+  from the public response.
