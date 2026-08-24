@@ -41,7 +41,6 @@ final class PublicReadNavigationReader
             ->select('id, menu_key, location, updated_at')
             ->where('is_active', 1)
             ->where('deleted_at', null)
-            ->whereIn('location', ['header', 'main', 'footer', 'legal'])
             ->orderBy('id', 'ASC')
             ->get();
         $menus = $menuQuery !== false ? $menuQuery->getResultArray() : [];
@@ -100,13 +99,8 @@ final class PublicReadNavigationReader
         $result = ['main' => null, 'footer' => null, 'legal' => null];
         foreach ($menus as $menu) {
             $menuId = (int) $menu['id'];
-            $location = match ((string) $menu['location']) {
-                'header', 'main' => 'main',
-                'footer' => 'footer',
-                'legal' => 'legal',
-                default => null,
-            };
-            if ($location === null || $result[$location] !== null) {
+            $menuKey = trim((string) $menu['menu_key']);
+            if ($menuKey === '' || ($result[$menuKey] ?? null) !== null) {
                 continue;
             }
 
@@ -148,8 +142,8 @@ final class PublicReadNavigationReader
                     'children' => [],
                 ];
             }
-            $result[$location] = [
-                'menu_key' => (string) $menu['menu_key'],
+            $result[$menuKey] = [
+                'menu_key' => $menuKey,
                 'location' => (string) $menu['location'],
                 'name' => (string) ($this->pick($menuTranslations[$menuId] ?? [], $locale, $default)['name'] ?? $menu['menu_key']),
                 'items' => $this->tree($flat),
