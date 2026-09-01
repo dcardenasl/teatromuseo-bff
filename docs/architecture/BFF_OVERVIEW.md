@@ -26,6 +26,26 @@ should not own:
    the hub (cached) so aggregator endpoints can personalize their responses
    without the hub knowing about the BFF's shape.
 
+## Fundamental query rule: SQL first
+
+The BFF's performance value is not merely reducing the number of client HTTP
+requests. Its read projections must give the database engine the work it is
+designed to do. When related data belongs to one database, prefer one bounded
+SQL projection with `JOIN`s, conditional aggregation, filtering, grouping,
+ordering and limits. Do not issue several queries and reconstruct the result
+with loops, in-memory joins, counts, grouping or sorting in PHP.
+
+PHP should be limited to transport, authenticated context, response envelopes
+and source-level fallback. It must not materialize large datasets to calculate
+metrics or relationships that SQL can calculate more efficiently.
+
+The platform has independent CMS, Catalog, Event and Hub databases, so a single
+cross-database `JOIN` is not always technically available. In that case the
+BFF uses one bounded, permission-aware SQL projection per database and performs
+only minimal composition of the completed source sections. Any additional
+query or PHP-side computation must have a documented reason, hard bounds and
+performance coverage.
+
 ---
 
 ## What the BFF is NOT
@@ -148,11 +168,18 @@ not needed for a simple JSON ping. `HealthController` extends the lightweight
 `CodeIgniter\Controller` for this reason, following the same justified exception
 pattern used by the hub's `HealthController`.
 
-### Why probe the hub in /ready and /health instead of a database?
+### Why is `/ready` cheap while `/health` is detailed?
 
-The BFF has no database. Its readiness depends entirely on whether it can reach
-its primary upstream (the hub). A tight-timeout `GET {hubUrl}/ping` is the
-correct readiness probe for a stateless gateway.
+The BFF's readiness depends on whether it can reach its primary upstream (the
+hub). A tight-timeout `GET {hubUrl}/ping` is the correct operational probe for
+a stateless gateway, so `/ready` performs only that one upstream check.
+
+`/health` is an explicit diagnostic endpoint, not a high-frequency monitor. It
+also checks the four named read-only database connections plus local disk and
+writable-folder state. Polling it every few seconds would consume PHP
+processes and database connections on the production shared host; cPanel and
+external monitors must use `/ping` or `/live`, and use `/ready` only when the
+single Hub dependency must be verified.
 
 ---
 

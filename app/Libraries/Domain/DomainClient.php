@@ -30,6 +30,24 @@ class DomainClient extends AbstractServiceClient
     }
 
     /**
+     * Fetch a structured JSON resource from a domain with the visitor's bearer.
+     *
+     * This is deliberately separate from {@see forward()}: aggregators need
+     * the decoded payload and canonical exceptions, while proxy endpoints need
+     * to preserve the upstream response unchanged.
+     *
+     * @return array<string, mixed>
+     */
+    public function get(string $path, string $bearerToken): array
+    {
+        return $this->request('GET', $path, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $bearerToken,
+            ],
+        ]);
+    }
+
+    /**
      * Widens the core allow-list with the headers webhook providers use to
      * sign their payloads (e.g. SendGrid Signed Event Webhooks) plus the
      * generic shared-token header, so upstream domains can authenticate

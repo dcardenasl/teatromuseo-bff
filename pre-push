@@ -1,0 +1,6 @@
+#!/bin/bash
+#
+# Non-blocking pre-push hook. Always exits 0.
+# Installed by composer's post-install-cmd/post-update-cmd.
+
+exit 0

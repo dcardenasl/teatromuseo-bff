@@ -16,7 +16,22 @@ jobs:
 
     strategy:
       matrix:
-        php-version: ['8.2', '8.3']
+        php-version: ['8.2', '8.3', '8.4', '8.5']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: "%"
+          MYSQL_DATABASE: bff_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout code
@@ -26,7 +41,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: intl, mbstring, json, openssl, curl
+          extensions: intl, mbstring, json, openssl, curl, mysqli
           coverage: none
 
       - name: Validate composer.json
@@ -35,13 +50,111 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Check Composer platform requirements
+        run: composer check-platform-reqs --no-dev
+
       - name: Configure .env for CI
         run: |
           cp .env.example .env
           printf '\nBFF_ALLOWED_ORIGINS=http://localhost:3000\n' >> .env
           printf 'bff.hubUrl=http://localhost:8080\n' >> .env
           printf 'bff.domainUrl=http://localhost:8090\n' >> .env
+          sed -i "s/^CATALOG_READONLY_DB_DATABASE = .*/CATALOG_READONLY_DB_DATABASE = 'bff_test'/" .env
+          sed -i "s/^CATALOG_READONLY_DB_USERNAME = .*/CATALOG_READONLY_DB_USERNAME = 'root'/" .env
+          sed -i "s/^CATALOG_READONLY_DB_PASSWORD = .*/CATALOG_READONLY_DB_PASSWORD = 'root'/" .env
+          sed -i "s/^EVENT_READONLY_DB_DATABASE = .*/EVENT_READONLY_DB_DATABASE = 'bff_test'/" .env
+          sed -i "s/^EVENT_READONLY_DB_USERNAME = .*/EVENT_READONLY_DB_USERNAME = 'root'/" .env
+          sed -i "s/^EVENT_READONLY_DB_PASSWORD = .*/EVENT_READONLY_DB_PASSWORD = 'root'/" .env
           php spark key:generate --force
+
+      - name: Seed public-read catalog fixture
+        run: |
+          mysql -h 127.0.0.1 -u root -proot bff_test -e "
+            CREATE TABLE IF NOT EXISTS collection_items (
+              id INTEGER PRIMARY KEY, name TEXT, category_id INTEGER, inventory_code TEXT,
+              status TEXT, summary TEXT, curiosidad TEXT, contenido TEXT, origin TEXT, period TEXT,
+              creator TEXT, ubicacion TEXT, materials TEXT, cover_file_id INTEGER, gallery_file_ids TEXT,
+              collection_number TEXT, collection_group TEXT, physical_description TEXT, dimensions TEXT,
+              ingress_type TEXT, donated_by TEXT, tags TEXT, links TEXT, company_history TEXT,
+              is_active INTEGER, show_in_totem INTEGER DEFAULT 1, created_at TEXT, updated_at TEXT, deleted_at TEXT
+            );
+            INSERT INTO collection_items (id, name, status, is_active, show_in_totem, created_at, updated_at)
+            VALUES (1, 'Pieza', 'published', 1, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+          "
 
       - name: Run quality suite
         run: composer quality
+
+  public-route-contract:
+    name: Web/BFF public route contract parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout BFF
+        uses: actions/checkout@v4
+
+      - name: Checkout Web contract source
+        uses: actions/checkout@v4
+        with:
+          repository: dcardenasl/teatromuseo-web
+          ref: dev
+          path: web-contract
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Compare the BFF adapter with the Web contract
+        run: |
+          php scripts/export-public-route-contract.php > /tmp/bff-public-routes.json
+          php web-contract/scripts/export-public-route-contract.php > /tmp/web-public-routes.json
+          diff --unified=0 /tmp/web-public-routes.json /tmp/bff-public-routes.json
+
+  public-read-integration:
+    name: Public-read SQL integration PHP 8.2
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: "%"
+          MYSQL_DATABASE: bff_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, mbstring, intl, json, curl
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Configure the disposable MySQL connection
+        run: |
+          cp .env.example .env
+          printf '\nCI_ENVIRONMENT = testing\n' >> .env
+          sed -i "s/^EVENT_READONLY_DB_DATABASE = .*/EVENT_READONLY_DB_DATABASE = 'bff_test'/" .env
+          sed -i "s/^EVENT_READONLY_DB_USERNAME = .*/EVENT_READONLY_DB_USERNAME = 'root'/" .env
+          sed -i "s/^EVENT_READONLY_DB_PASSWORD = .*/EVENT_READONLY_DB_PASSWORD = 'root'/" .env
+          sed -i "s/^CATALOG_READONLY_DB_DATABASE = .*/CATALOG_READONLY_DB_DATABASE = 'bff_test'/" .env
+          sed -i "s/^CATALOG_READONLY_DB_USERNAME = .*/CATALOG_READONLY_DB_USERNAME = 'root'/" .env
+          sed -i "s/^CATALOG_READONLY_DB_PASSWORD = .*/CATALOG_READONLY_DB_PASSWORD = 'root'/" .env
+
+      - name: Run MySQL public-read integration suite
+        run: composer test:integration

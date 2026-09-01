@@ -63,6 +63,7 @@ class HealthControllerTest extends ApiTestCase
         $json = json_decode((string) $result->response()->getBody(), true);
         $this->assertSame('ready', $json['status']);
         $this->assertSame('healthy', $json['hub']['status']);
+        $this->assertArrayNotHasKey('databases', $json);
     }
 
     public function testReadyReturns503WhenHubIsUnreachable(): void
@@ -75,6 +76,7 @@ class HealthControllerTest extends ApiTestCase
         $json = json_decode((string) $result->response()->getBody(), true);
         $this->assertSame('not_ready', $json['status']);
         $this->assertSame('unhealthy', $json['hub']['status']);
+        $this->assertArrayNotHasKey('databases', $json);
     }
 
     public function testReadyReturns503WhenHubResponds5xx(): void
@@ -100,6 +102,19 @@ class HealthControllerTest extends ApiTestCase
         $this->assertArrayHasKey('disk', $json['checks']);
         $this->assertArrayHasKey('writable', $json['checks']);
         $this->assertArrayNotHasKey('database', $json['checks']);
+    }
+
+    public function testVersionedHealthAliasUsesTheSameContract(): void
+    {
+        $this->mockHubPing(200);
+
+        $result = $this->get('/api/v1/health');
+
+        $result->assertStatus(200);
+        $json = json_decode((string) $result->response()->getBody(), true);
+        $this->assertContains($json['status'], ['healthy', 'degraded']);
+        $this->assertArrayHasKey('hub', $json['checks']);
+        $this->assertArrayHasKey('databases', $json['checks']);
     }
 
     public function testHealthEndpointReturns503WhenMonitoringDisabled(): void

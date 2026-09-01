@@ -24,6 +24,21 @@ class Services extends BaseService
             return static::getSharedInstance('hubClient');
         }
 
+        return static::createHubClient();
+    }
+
+    public static function hubDashboardClient(bool $getShared = true): \App\Libraries\Hub\HubClient
+    {
+        if ($getShared) {
+            return static::getSharedInstance('hubDashboardClient');
+        }
+
+        return static::createHubClient();
+    }
+
+    private static function createHubClient(): \App\Libraries\Hub\HubClient
+    {
+
         /** @var \Config\Hub $hubConfig */
         $hubConfig = config('Hub');
 
@@ -38,7 +53,7 @@ class Services extends BaseService
             httpTimeout: $hubConfig->httpTimeout ?? 5,
         );
 
-        return new \dcardenasl\Ci4ApiCore\Http\Client\HubClient(
+        return new \App\Libraries\Hub\HubClient(
             $coreHubConfig,
             \Config\Services::curlrequest(),
             \Config\Services::cache()
@@ -74,6 +89,15 @@ class Services extends BaseService
         return new \dcardenasl\Ci4ApiCore\Monitoring\HealthChecker();
     }
 
+    public static function runtimeDiagnostics(bool $getShared = true): \App\Monitoring\RuntimeDiagnostics
+    {
+        if ($getShared) {
+            return static::getSharedInstance('runtimeDiagnostics');
+        }
+
+        return new \App\Monitoring\RuntimeDiagnostics();
+    }
+
     /**
      * The Request Service
      *
@@ -93,5 +117,250 @@ class Services extends BaseService
             'php://input',
             new \CodeIgniter\HTTP\UserAgent()
         );
+    }
+
+    public static function publicReadCms(bool $getShared = true): \App\PublicRead\CmsPublicReadBundle
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCms');
+        }
+
+        return \App\PublicRead\PublicReadContainer::cms();
+    }
+
+    public static function publicReadCmsLanguages(bool $getShared = true): \App\PublicRead\CmsLanguageReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCmsLanguages');
+        }
+
+        return new \App\PublicRead\CmsLanguageReader(
+            \App\PublicRead\PublicReadContainer::database('cms_readonly'),
+        );
+    }
+
+    public static function publicReadDatabaseHealth(bool $getShared = true): \App\PublicRead\ReadDatabaseHealth
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadDatabaseHealth');
+        }
+
+        return new \App\PublicRead\ReadDatabaseHealth();
+    }
+
+    public static function adminReadCmsDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsDashboard();
+    }
+
+    public static function adminReadCmsAnalyticsDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsAnalyticsDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsAnalyticsDashboard();
+    }
+
+    public static function adminReadCmsAnalytics(bool $getShared = true): \App\AdminRead\Contracts\AdminAnalyticsSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsAnalytics');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsAnalytics();
+    }
+
+    public static function adminReadCmsTranslationsDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardTranslationsSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsTranslationsDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsTranslationsDashboard();
+    }
+
+    public static function adminReadCatalogDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogDashboard();
+    }
+
+    public static function adminReadCatalogCollectionItemWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogCollectionItemSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogCollectionItemWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogCollectionItemWorkspace();
+    }
+
+    public static function adminReadCatalogCollectionItemList(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogCollectionItemListSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogCollectionItemList');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogCollectionItemList();
+    }
+
+    public static function adminReadCatalogTechnique(bool $getShared = true): \App\AdminRead\Contracts\AdminCatalogTechniqueSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCatalogTechnique');
+        }
+
+        return \App\AdminRead\AdminReadContainer::catalogTechnique();
+    }
+
+    public static function adminReadEventDashboard(bool $getShared = true): \App\AdminRead\Contracts\AdminDashboardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventDashboard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventDashboard();
+    }
+
+    public static function adminReadEventWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminEventWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventWorkspace();
+    }
+
+    public static function adminReadEventList(bool $getShared = true): \App\AdminRead\Contracts\AdminEventListSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventList');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventList();
+    }
+
+    public static function adminReadFileUsages(bool $getShared = true): \App\AdminRead\Contracts\AdminFileUsageSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadFileUsages');
+        }
+
+        return \App\AdminRead\AdminReadContainer::fileUsages();
+    }
+
+    public static function adminReadEventLookups(bool $getShared = true): \App\AdminRead\Contracts\AdminEventLookupSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadEventLookups');
+        }
+
+        return \App\AdminRead\AdminReadContainer::eventLookups();
+    }
+
+    public static function adminReadCmsBootstrap(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsBootstrapSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsBootstrap');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsBootstrap();
+    }
+
+    public static function adminReadCmsCategory(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsCategorySourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsCategory');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsCategory();
+    }
+
+    public static function adminReadCmsWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsWorkspace();
+    }
+
+    public static function adminReadCmsWizard(bool $getShared = true): \App\AdminRead\Contracts\AdminCmsWizardSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadCmsWizard');
+        }
+
+        return \App\AdminRead\AdminReadContainer::cmsWizard();
+    }
+
+    public static function adminReadIamRoleWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminIamRoleWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadIamRoleWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::iamRoleWorkspace();
+    }
+
+    public static function adminReadMetricsWorkspace(bool $getShared = true): \App\AdminRead\Contracts\AdminMetricsWorkspaceSourceInterface
+    {
+        if ($getShared) {
+            return static::getSharedInstance('adminReadMetricsWorkspace');
+        }
+
+        return \App\AdminRead\AdminReadContainer::metricsWorkspace();
+    }
+
+    public static function publicReadCatalog(bool $getShared = true): \App\PublicRead\Catalog\PublicReadCollectionItemReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCatalog');
+        }
+
+        return \App\PublicRead\PublicReadContainer::catalog();
+    }
+
+    public static function publicReadCatalogFacets(bool $getShared = true): \App\PublicRead\CatalogFacetReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadCatalogFacets');
+        }
+
+        return \App\PublicRead\PublicReadContainer::catalogFacets();
+    }
+
+    public static function publicReadEvents(bool $getShared = true): \App\PublicRead\Event\PublicReadEventReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadEvents');
+        }
+
+        return \App\PublicRead\PublicReadContainer::events();
+    }
+
+    public static function publicReadEventTypes(bool $getShared = true): \App\PublicRead\EventTypeReader
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadEventTypes');
+        }
+
+        return \App\PublicRead\PublicReadContainer::eventTypes();
+    }
+
+    public static function publicReadPageEnvelope(bool $getShared = true): \App\PublicRead\Page\PageEnvelope
+    {
+        if ($getShared) {
+            return static::getSharedInstance('publicReadPageEnvelope');
+        }
+
+        return \App\PublicRead\PublicReadContainer::pageEnvelope();
     }
 }

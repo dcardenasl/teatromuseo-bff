@@ -21,9 +21,10 @@ use RuntimeException;
  * — the hub's base URL — is canonicalised under `bff.hubUrl` here; `hub.url`
  * is accepted as a fallback so older `.env` files keep working.
  *
- * Authentication is forward-only: the BFF does not validate JWTs, it relays
- * the client's `Authorization` header to the upstream. This config therefore
- * has nothing to say about JWT secrets or sessions.
+ * Authentication is forward-only for protected proxy routes: the BFF does not
+ * validate JWTs, it relays the client's `Authorization` header upstream. The
+ * public-read surface is separately protected by its application key and
+ * dedicated read-only database users.
  */
 class Bff extends BaseConfig
 {
@@ -33,6 +34,9 @@ class Bff extends BaseConfig
      * Resolved from `bff.hubUrl` first; falls back to `hub.url` if unset.
      */
     public string $hubUrl = '';
+
+    /** Public base URL used only when Hub file rows contain portable paths. */
+    public string $hubPublicBaseUrl = '';
 
     /**
      * Base URLs of upstream domain apps.
@@ -54,6 +58,7 @@ class Bff extends BaseConfig
         parent::__construct();
 
         $this->hubUrl = self::resolveHubUrl();
+        $this->hubPublicBaseUrl = rtrim((string) env('HUB_PUBLIC_BASE_URL', $this->hubUrl), '/');
 
         // Parse domains from env: BFF_DOMAINS="auth:http://localhost:8190,billing:http://localhost:8091"
         $rawDomains = (string) env('BFF_DOMAINS', '');

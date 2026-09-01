@@ -45,6 +45,7 @@ $RECYCLE.BIN/
 .env.*
 !.env.example
 !.env.docker.example
+!.deploy/.env.deploy.example
 .vagrant
 Vagrantfile
 
@@ -193,3 +194,10 @@ public/writable/tests/uploads/
 public/writable/uploads/
 
 tests/ci4_test.sqlite
+
+# Versioned FTP/FTPS deploy tooling; ignore only local credentials/state.
+.deploy/.env.deploy
+.deploy/.last_ftp_deploy
+.deploy/.rollback/
+__pycache__/
+*.pyc

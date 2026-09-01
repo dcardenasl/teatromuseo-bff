@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Config;
 
+use App\Libraries\Domain\DomainClient;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Bff;
+use Config\Services;
 use ReflectionClass;
 use RuntimeException;
 
@@ -83,6 +85,51 @@ class BffConfigTest extends CIUnitTestCase
         $config = new Bff();
 
         $this->assertSame(['http://a.test', 'http://b.test'], $config->allowedOrigins);
+    }
+
+    public function testParsesConfiguredDashboardDomainCoordinates(): void
+    {
+        $originalGetenv = getenv('BFF_DOMAINS');
+        $hadEnv         = array_key_exists('BFF_DOMAINS', $_ENV);
+        $hadServer      = array_key_exists('BFF_DOMAINS', $_SERVER);
+        $savedEnv       = $hadEnv ? (string) $_ENV['BFF_DOMAINS'] : '';
+        $savedServer    = $hadServer ? (string) $_SERVER['BFF_DOMAINS'] : '';
+
+        putenv('BFF_DOMAINS=cms:http://cms.test,catalog:http://catalog.test,event:http://event.test');
+        $_ENV['BFF_DOMAINS']    = 'cms:http://cms.test,catalog:http://catalog.test,event:http://event.test';
+        $_SERVER['BFF_DOMAINS'] = 'cms:http://cms.test,catalog:http://catalog.test,event:http://event.test';
+
+        try {
+            $config = new Bff();
+
+            $this->assertSame([
+                'cms'     => 'http://cms.test',
+                'catalog' => 'http://catalog.test',
+                'event'   => 'http://event.test',
+            ], $config->domains);
+
+            foreach (['cms', 'catalog', 'event'] as $domainCode) {
+                $this->assertInstanceOf(DomainClient::class, Services::domainClient($domainCode, false));
+            }
+        } finally {
+            if ($originalGetenv !== false) {
+                putenv('BFF_DOMAINS=' . $originalGetenv);
+            } else {
+                putenv('BFF_DOMAINS');
+            }
+
+            if ($hadEnv) {
+                $_ENV['BFF_DOMAINS'] = $savedEnv;
+            } else {
+                unset($_ENV['BFF_DOMAINS']);
+            }
+
+            if ($hadServer) {
+                $_SERVER['BFF_DOMAINS'] = $savedServer;
+            } else {
+                unset($_SERVER['BFF_DOMAINS']);
+            }
+        }
     }
 
     public function testEmptyAllowedOriginsTolerableInDevelopment(): void

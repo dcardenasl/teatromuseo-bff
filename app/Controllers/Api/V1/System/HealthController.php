@@ -20,9 +20,9 @@ use Throwable;
  * Infrastructure endpoint — kept thin (no `ApiController` overhead) because it
  * is called every 5–10s by orchestrators (Kubernetes, Docker Swarm).
  *
- * The BFF has no database, so the readiness/health probes ping the upstream
- * hub (`GET {hubUrl}/ping`) with a tight timeout instead of probing a DB. This
- * matches the architectural invariant declared in `CLAUDE.md`.
+ * Readiness checks only the upstream Hub. The detailed `/health` endpoint is
+ * intentionally separate because probing four databases on every readiness
+ * request would consume scarce hosting processes and database connections.
  */
 class HealthController extends Controller
 {
@@ -32,6 +32,7 @@ class HealthController extends Controller
     private HealthChecker $healthChecker;
     private CURLRequest $http;
     private BffConfig $bff;
+    private \App\PublicRead\ReadDatabaseHealth $readDatabaseHealth;
 
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger): void
     {
@@ -39,6 +40,7 @@ class HealthController extends Controller
         $this->healthChecker = Services::healthChecker();
         $this->http          = Services::curlrequest();
         $this->bff           = config('Bff');
+        $this->readDatabaseHealth = Services::publicReadDatabaseHealth();
     }
 
     /**
@@ -65,7 +67,10 @@ class HealthController extends Controller
     }
 
     /**
-     * GET /ready — ready to serve traffic iff the hub is reachable.
+     * GET /ready — ready to serve traffic iff the Hub responds.
+     *
+     * This is the cheap operational probe. Use `/health` only for an explicit
+     * detailed diagnostic because it performs the four SELECT-only probes.
      */
     public function ready(): ResponseInterface
     {
@@ -80,12 +85,13 @@ class HealthController extends Controller
     }
 
     /**
-     * GET /health — overall status: hub probe + local disk/writable checks.
+     * GET /health — overall status: Hub, read databases and local checks.
      */
     public function index(): ResponseInterface
     {
         $checks = [
             'hub'      => $this->probeHub(),
+            'databases' => $this->readDatabaseHealth->check(),
             'disk'     => $this->healthChecker->checkDiskSpace(),
             'writable' => $this->healthChecker->checkWritableFolders(),
         ];

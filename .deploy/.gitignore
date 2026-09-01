@@ -1,0 +1,11 @@
+.env.deploy
+.last_ftp_deploy
+.rollback/
+dist/
+__pycache__/
+*.pyc
+*.tmp
+*.zip
+cleanup_check.py
+package-initial.py
+.DS_Store

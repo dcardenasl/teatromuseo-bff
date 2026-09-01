@@ -14,7 +14,8 @@ use OpenApi\Attributes as OA;
  * tokens, so the security scheme below documents the wire format only.
  *
  * Tags map to the BFF's own controllers: System (health/ping/live/ready),
- * Users (proxy example, BFF-103), Me (introspect-auth aggregator, BFF-106).
+ * Users (proxy example, BFF-103), Me (introspect-auth aggregators, BFF-106 and
+ * the real Admin dashboard consumer).
  */
 #[OA\OpenApi(
     openapi: '3.0.0',
@@ -35,6 +36,13 @@ use OpenApi\Attributes as OA;
     bearerFormat: 'JWT',
     description: 'JWT issued by the upstream hub. The BFF forwards it verbatim on every call.'
 )]
+#[OA\SecurityScheme(
+    securityScheme: 'appKeyAuth',
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-App-Key',
+    description: 'Shared application key for the unauthenticated public-read surface (`BFF_API_KEY`/`WEB_API_KEY`). Distinct from `hub.apiKey`, which identifies the BFF for its own outbound Hub calls.'
+)]
 #[OA\Tag(
     name: 'System',
     description: 'Health and readiness endpoints'
@@ -46,6 +54,10 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(
     name: 'Me',
     description: 'Aggregator endpoints scoped to the authenticated user'
+)]
+#[OA\Tag(
+    name: 'PublicRead',
+    description: 'Unauthenticated, app-key-gated public content surface consumed by teatromuseo-web'
 )]
 class OpenApi
 {

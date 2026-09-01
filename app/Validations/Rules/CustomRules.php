@@ -131,7 +131,7 @@ class CustomRules
      *
      * @param string|null $value The value to validate
      * @param string      $params Expected length (default: 64 for 32 bytes hex)
-     * @param array       $data   All validation data
+     * @param array<string, mixed> $data   All validation data
      * @param string|null $error  Error message (passed by reference)
      * @return bool
      */

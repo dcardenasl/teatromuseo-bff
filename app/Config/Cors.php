@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Config;
 
 use CodeIgniter\Config\BaseConfig;
+use RuntimeException;
 
 /**
  * Cross-Origin Resource Sharing (CORS) Configuration
@@ -67,6 +68,22 @@ class Cors extends BaseConfig
         }
         if ($exposedHeaders !== []) {
             $this->default['exposedHeaders'] = $exposedHeaders;
+        }
+
+        // A literal '*' in the allow-list plus credentials support is the
+        // classic CORS misconfiguration: the filter would reflect ANY
+        // origin (in_array('*', ...) matches everything) while also setting
+        // Access-Control-Allow-Credentials: true, letting any site read
+        // authenticated responses on the visitor's behalf. Unlike the
+        // empty-allow-list guard in Config\Bff, this is unsafe in every
+        // environment, not just production.
+        if ($this->default['supportsCredentials'] && in_array('*', $this->default['allowedOrigins'], true)) {
+            throw new RuntimeException(
+                'BFF misconfigured: BFF_ALLOWED_ORIGINS contains "*" while '
+                . 'CORS_SUPPORTS_CREDENTIALS is enabled. Wildcard origins cannot '
+                . 'be combined with credentialed CORS — list explicit origins in '
+                . 'BFF_ALLOWED_ORIGINS or disable CORS_SUPPORTS_CREDENTIALS.'
+            );
         }
     }
 
